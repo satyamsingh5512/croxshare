@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Settings, Wifi, WifiOff, History as HistoryIcon, Keyboard, BarChart3, Bell, Moon, Sun, Gauge } from 'lucide-react';
 import Link from 'next/link';
@@ -29,8 +29,9 @@ import { useToast } from '@/components/ui/Toast';
 import { StatusBadge } from '@/components/ui/Badge';
 import { compressFile, formatCompressionRatio } from '@/lib/compression';
 import { formatFileSize } from '@/lib/fileUtils';
+import { simulateLatency, experienceRuntime } from '@/lib/experienceConfig';
 
-const SIGNALING_URL = 'ws://localhost:8080';
+const SIGNALING_URL = process.env.NEXT_PUBLIC_SIGNALING_URL || 'ws://localhost:8080';
 
 export default function NebayShareIntegratedPage() {
   const [mode, setMode] = useState<'idle' | 'host' | 'join'>('idle');
@@ -53,6 +54,15 @@ export default function NebayShareIntegratedPage() {
     startTime?: number;
     status: 'pending' | 'uploading' | 'completed' | 'error';
   }>>([]);
+  const heroPhrases = useMemo(
+    () => [
+      'Premium P2P that feels instant.',
+      'Deep Charcoal. Indigo energy.',
+      'Enterprise-grade security. Zero cloud.',
+    ],
+    []
+  );
+  const [heroIndex, setHeroIndex] = useState(0);
 
   const { success, error: showError, info, warning } = useToast();
   const { history, addTransfer, clearHistory } = useTransferHistory();
@@ -138,6 +148,13 @@ export default function NebayShareIntegratedPage() {
       description: 'Show shortcuts',
     },
   ], mode !== 'idle');
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setHeroIndex((prev) => (prev + 1) % heroPhrases.length);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [heroPhrases.length]);
 
   // Show error toasts
   useEffect(() => {
@@ -233,6 +250,7 @@ export default function NebayShareIntegratedPage() {
     const generatedRoomId = Math.random().toString(36).substr(2, 8).toUpperCase();
     setRoomId(generatedRoomId);
     setMode('host');
+    await simulateLatency('discovery');
     await createRoom(generatedRoomId, deviceName);
     info('Room Created', `Room ID: ${generatedRoomId}. Waiting for devices...`);
   };
@@ -247,6 +265,7 @@ export default function NebayShareIntegratedPage() {
       return;
     }
     setMode('join');
+    await simulateLatency('discovery');
     await joinRoom(roomId, deviceName);
     info('Joining Room', `Connecting to room ${roomId}...`);
   };
@@ -306,7 +325,9 @@ export default function NebayShareIntegratedPage() {
             f.name === file.name ? { ...f, status: 'uploading', progress: 0, startTime, speed: 0 } : f
           )
         );
-        info('Sending File', `Transferring ${file.name}...`);
+  info('Sending File', `Transferring ${file.name}...`);
+  await simulateLatency('upload');
+  info('Optimizing Route', `${experienceRuntime.label} calibrating throughput`);
         await sendFile(fileToSend);
         setFileStates(prev =>
           prev.map(f =>
@@ -370,18 +391,19 @@ export default function NebayShareIntegratedPage() {
   };
 
   const getConnectionStatus = () => {
-    if (isVerified) return 'online';
-    if (connectionState === 'connected') return 'connecting';
+    if (mode === 'idle' && connectionState === 'disconnected') return 'idle';
+    if (isVerified || connectionState === 'verified') return 'online';
+    if (connectionState === 'connected') return 'online';
     if (connectionState === 'connecting') return 'connecting';
     return 'offline';
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-dark-bg dark:via-dark-card dark:to-dark-surface transition-colors duration-500">
+    <div className="relative z-10 min-h-screen py-8">
       {/* Header */}
-      <div className="border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-dark-card/80 backdrop-blur-xl sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+      <div className="sticky top-4 z-20 px-4 sm:px-6 lg:px-10">
+        <div className="rounded-2xl border border-white/10 bg-deep-charcoal/70 backdrop-blur-md px-4 py-4 sm:px-6 flex flex-col gap-4 shadow-2xl shadow-black/30">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-4">
               <Link href="/">
                 <Button variant="ghost" size="sm">
@@ -389,29 +411,28 @@ export default function NebayShareIntegratedPage() {
                 </Button>
               </Link>
               <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                  Nebay Share Pro
+                <p className="text-xs uppercase tracking-[0.3em] text-white/60">Nebay Share Pro</p>
+                <h1 className="text-3xl font-bold text-transparent bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text">
+                  Deep Charcoal Engine
                 </h1>
-                <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
-                  Real P2P File Transfer
+                <p className="text-sm text-white/70 flex items-center gap-2">
+                  Real P2P · Runtime {experienceRuntime.label}
                   <StatusBadge status={getConnectionStatus()} />
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              {/* Dark Mode Toggle */}
+            <div className="flex flex-wrap items-center gap-2">
               {mounted && (
                 <DarkModeToggleButton
                   isDarkMode={isDarkMode}
                   onToggle={toggleDarkMode}
                 />
               )}
-              
-              {/* Mobile Share Button */}
+
               {selectedFiles.length > 0 && (
                 <ShareButton files={selectedFiles} />
               )}
-              
+
               <Button 
                 variant="outline" 
                 size="sm"
@@ -459,23 +480,49 @@ export default function NebayShareIntegratedPage() {
                 onClick={() => setShowSettingsModal(true)}
                 title="Settings"
               >
-                <Settings className="w-5 h-5" />
+                <motion.span
+                  animate={{ rotate: showSettingsModal ? 45 : 0 }}
+                  transition={{ type: 'spring', stiffness: 200, damping: 14 }}
+                  className="inline-flex"
+                >
+                  <Settings className="w-5 h-5" />
+                </motion.span>
               </Button>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-10 py-10 space-y-10">
+        {mode === 'idle' && (
+          <section className="space-y-6 text-center lg:text-left">
+            <p className="text-xs uppercase tracking-[0.35em] text-white/60">Air-gapped ready</p>
+            <div className="relative min-h-[80px]">
+              <motion.h2
+                key={heroIndex}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tighter text-white"
+              >
+                {heroPhrases[heroIndex]}
+              </motion.h2>
+            </div>
+            <p className="text-lg text-white/70 max-w-3xl mx-auto lg:mx-0">
+              Share securely across WiFi with simulated network latency for realistic handshakes and adaptive routing guided by the {experienceRuntime.label}.
+            </p>
+          </section>
+        )}
+
         {mode === 'idle' ? (
           /* Setup Screen */
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-3xl mx-auto">
             <Card glass>
               <CardHeader>
                 <h2 className="text-2xl font-bold text-text-light dark:text-text-dark">
                   Get Started
                 </h2>
-                <p className="text-gray-600 dark:text-gray-400">
+                <p className="text-white/60">
                   Choose how you want to share files
                 </p>
               </CardHeader>
@@ -490,12 +537,12 @@ export default function NebayShareIntegratedPage() {
                     value={deviceName}
                     onChange={(e) => setDeviceName(e.target.value)}
                     placeholder="My Device"
-                    className="w-full px-4 py-3 rounded-xl bg-white dark:bg-dark-surface border border-gray-300 dark:border-gray-700 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                    className="w-full px-4 py-3 rounded-xl bg-white/5 dark:bg-white/5 border border-white/10 focus:border-primary focus:ring-2 focus:ring-primary/30 outline-none transition-all text-white"
                   />
                 </div>
 
                 {/* Host or Join */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <Card hover className="cursor-pointer" onClick={handleHostRoom}>
                     <CardBody className="text-center space-y-3">
                       <div className="w-16 h-16 mx-auto bg-gradient-to-br from-primary to-accent rounded-2xl flex items-center justify-center">
@@ -504,7 +551,7 @@ export default function NebayShareIntegratedPage() {
                       <h3 className="text-lg font-bold text-text-light dark:text-text-dark">
                         Host Room
                       </h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <p className="text-sm text-white/70">
                         Create a new room and share files with others
                       </p>
                       <Button className="w-full">Create Room</Button>
@@ -519,7 +566,7 @@ export default function NebayShareIntegratedPage() {
                       <h3 className="text-lg font-bold text-text-light dark:text-text-dark">
                         Join Room
                       </h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <p className="text-sm text-white/70">
                         Enter a room ID to connect with another device
                       </p>
                       <input
@@ -527,7 +574,7 @@ export default function NebayShareIntegratedPage() {
                         value={roomId}
                         onChange={(e) => setRoomId(e.target.value.toUpperCase())}
                         placeholder="ROOM ID"
-                        className="w-full px-4 py-2 rounded-xl bg-white dark:bg-dark-surface border border-gray-300 dark:border-gray-700 focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all text-center font-mono"
+                        className="w-full px-4 py-2 rounded-xl bg-white/5 dark:bg-white/5 border border-white/10 focus:border-accent focus:ring-2 focus:ring-accent/30 outline-none transition-all text-center font-mono text-white"
                         maxLength={8}
                       />
                       <Button onClick={handleJoinRoom} variant="secondary" className="w-full">
@@ -541,9 +588,9 @@ export default function NebayShareIntegratedPage() {
           </div>
         ) : (
           /* Transfer Screen */
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             {/* Connection Info */}
-            <div>
+      <div className="xl:col-span-1">
               <Card>
                 <CardHeader>
                   <h2 className="text-xl font-bold text-text-light dark:text-text-dark">
@@ -551,7 +598,7 @@ export default function NebayShareIntegratedPage() {
                   </h2>
                 </CardHeader>
                 <CardBody className="space-y-4">
-                  <div className="flex justify-between items-center p-4 rounded-xl bg-gradient-to-r from-primary/10 to-accent/10">
+                  <div className="flex justify-between items-center p-4 rounded-2xl bg-gradient-to-r from-primary/10 to-accent/10">
                     <span className="text-sm font-medium">Room ID:</span>
                     <span className="text-xl font-mono font-bold">{roomId}</span>
                   </div>
@@ -568,7 +615,7 @@ export default function NebayShareIntegratedPage() {
                   
                   {/* Connection Quality Indicator */}
                   {isVerified && dataChannel && (
-                    <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                    <div className="p-4 rounded-2xl glass-panel dark:glass-panel-dark border border-white/10">
                       <ConnectionQualityIndicator
                         quality={connectionQuality.metrics.quality}
                         rtt={connectionQuality.metrics.rtt}
@@ -604,13 +651,13 @@ export default function NebayShareIntegratedPage() {
             </div>
 
             {/* File Transfer */}
-            <div>
+            <div className="xl:col-span-2">
               <Card>
                 <CardHeader>
                   <h2 className="text-xl font-bold text-text-light dark:text-text-dark">
                     File Transfer
                   </h2>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <p className="text-sm text-white/70">
                     {isVerified ? 'Ready to send files' : 'Verify connection first'}
                   </p>
                 </CardHeader>
@@ -624,7 +671,7 @@ export default function NebayShareIntegratedPage() {
                     <>
                       <FileList files={fileStates} onRemove={handleRemoveFile} />
                       
-                      <div className="flex gap-3">
+                      <div className="flex gap-4 flex-wrap">
                         <Button
                           onClick={handleSendFiles}
                           disabled={!isVerified || fileStates.every(f => f.status !== 'pending')}
@@ -674,7 +721,7 @@ export default function NebayShareIntegratedPage() {
         <div className="space-y-6">
           {mode === 'host' ? (
             <>
-              <p className="text-center text-gray-600 dark:text-gray-400">
+              <p className="text-center text-white/70">
                 Share this code with the other device:
               </p>
               <div className="p-6 rounded-2xl bg-gradient-to-br from-primary/10 to-accent/10 text-center">
@@ -682,13 +729,13 @@ export default function NebayShareIntegratedPage() {
                   {String(verifyCode).padStart(4, '0')}
                 </p>
               </div>
-              <p className="text-sm text-center text-gray-500 dark:text-gray-500">
+              <p className="text-sm text-center text-white/50">
                 Waiting for verification...
               </p>
             </>
           ) : (
             <>
-              <p className="text-center text-gray-600 dark:text-gray-400">
+              <p className="text-center text-white/70">
                 Enter the 4-digit code shown on the host device:
               </p>
               <div className="flex justify-center">

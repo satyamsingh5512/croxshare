@@ -49,11 +49,11 @@ export function DropZone({ onFilesSelected, isDisabled = false }: DropZoneProps)
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`relative rounded-3xl border-2 border-dashed transition-all duration-300 ${
+      className={`relative rounded-2xl border-2 border-dashed backdrop-blur-md transition-all duration-500 ${
         isDragging
-          ? 'border-primary bg-primary/10 shadow-glow scale-[1.02]'
-          : 'border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-dark-card/50'
-      } ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-primary/50'}`}
+          ? 'border-primary bg-primary/10 shadow-brand-glow scale-[1.02]'
+          : 'border-white/10 dark:border-white/5 bg-white/5 dark:bg-white/5'
+      } ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-primary/40'}`}
     >
       <label className={`block p-12 ${isDisabled ? '' : 'cursor-pointer'}`}>
         <input
@@ -78,7 +78,7 @@ export function DropZone({ onFilesSelected, isDisabled = false }: DropZoneProps)
                 : {}
             }
             transition={{ duration: 0.5, repeat: isDragging ? Infinity : 0 }}
-            className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 ${
+            className={`w-20 h-20 rounded-2xl flex items-center justify-center mb-6 ${
               isDragging
                 ? 'bg-gradient-to-br from-primary to-accent shadow-glow'
                 : 'bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800'
@@ -105,7 +105,7 @@ export function DropZone({ onFilesSelected, isDisabled = false }: DropZoneProps)
               scale: [0.95, 1.05, 0.95],
             }}
             transition={{ duration: 2, repeat: Infinity }}
-            className="absolute inset-0 rounded-3xl bg-gradient-to-br from-primary/20 to-accent/20 blur-xl pointer-events-none"
+            className="absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 blur-xl pointer-events-none"
           />
         )}
       </label>

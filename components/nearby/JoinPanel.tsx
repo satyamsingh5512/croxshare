@@ -3,7 +3,10 @@ import { useP2PFileTransfer } from '../../hooks/useP2PFileTransfer';
 import VerificationCard from './VerificationCard';
 import FileProgress from './FileProgress';
 
-const SIGNALING_URL = (typeof window !== 'undefined' && (window as any).__SIGNALING_URL) || 'ws://localhost:8080';
+const SIGNALING_URL =
+  (typeof window !== 'undefined' && (window as any).__SIGNALING_URL) ||
+  process.env.NEXT_PUBLIC_SIGNALING_URL ||
+  'ws://localhost:8080';
 
 export default function JoinPanel() {
   const p2p = useP2PFileTransfer(SIGNALING_URL);

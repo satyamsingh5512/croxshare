@@ -14,20 +14,22 @@ interface CardProps {
 }
 
 export function Card({ children, className, hover = true, glow = false, glass = false, onClick }: CardProps) {
-  const baseStyles = 'rounded-2xl transition-all duration-300';
+  const baseStyles = 'rounded-2xl transition-all duration-500 shadow-lg shadow-black/20';
   
   const glassStyles = glass
-    ? 'bg-white/10 dark:bg-white/5 backdrop-blur-xl border border-white/20 dark:border-white/10'
-    : 'bg-white dark:bg-dark-card border border-gray-200 dark:border-gray-800';
+    ? 'glass-panel dark:glass-panel-dark'
+    : 'bg-white/90 dark:bg-dark-card/90 border border-white/10 dark:border-white/5 backdrop-blur-md';
 
-  const hoverStyles = hover ? 'hover:scale-105 hover:shadow-xl cursor-pointer' : '';
-  const glowStyles = glow ? 'hover:shadow-glow dark:hover:shadow-glow' : '';
+  const hoverStyles = hover ? 'cursor-pointer' : 'cursor-default';
+  const glowStyles = glow ? 'hover:shadow-brand-glow' : '';
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
+      transition={{ type: 'spring', stiffness: 200, damping: 24 }}
+      whileHover={hover ? { scale: 1.05 } : undefined}
+      whileTap={hover ? { scale: 0.95 } : undefined}
       className={cn(baseStyles, glassStyles, hoverStyles, glowStyles, className)}
       onClick={onClick}
     >
@@ -37,7 +39,7 @@ export function Card({ children, className, hover = true, glow = false, glass = 
 }
 
 export function CardHeader({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cn('p-6 border-b border-gray-200 dark:border-gray-800', className)}>{children}</div>;
+  return <div className={cn('p-6 border-b border-white/10 dark:border-white/5', className)}>{children}</div>;
 }
 
 export function CardBody({ children, className }: { children: React.ReactNode; className?: string }) {
@@ -45,5 +47,5 @@ export function CardBody({ children, className }: { children: React.ReactNode; c
 }
 
 export function CardFooter({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cn('p-6 border-t border-gray-200 dark:border-gray-800', className)}>{children}</div>;
+  return <div className={cn('p-6 border-t border-white/10 dark:border-white/5', className)}>{children}</div>;
 }
