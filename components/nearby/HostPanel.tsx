@@ -4,6 +4,7 @@ import DeviceNameModal from './DeviceNameModal';
 import VerificationCard from './VerificationCard';
 import FileDropzone from './FileDropzone';
 import FileProgress from './FileProgress';
+import QRCodeDisplay from './QRCodeDisplay';
 
 const SIGNALING_URL = (typeof window !== 'undefined' && (window as any).__SIGNALING_URL) || 'ws://localhost:8080';
 
@@ -53,6 +54,9 @@ export default function HostPanel() {
             </div>
             <div className="mt-3 text-sm text-[#4B5563]">Status: {p2p.connectionState === 'connecting' ? 'Waiting for connection…' : p2p.connectionState}</div>
           </div>
+
+          {/* QR Code */}
+          <QRCodeDisplay url={`${typeof window !== 'undefined' ? window.location.origin : ''}/nearby-share?room=${roomCode}`} />
 
           {p2p.connectionState !== 'verified' && (
             <VerificationCard peerName={p2p.peerDeviceName} code={p2p.verifyCode ?? null} onConfirm={async () => { await p2p.confirmVerification(); }} />

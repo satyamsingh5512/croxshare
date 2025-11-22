@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "ws": "^8.18.0",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.12",
+    "@types/qrcode": "^1.5.5"
+  }
+}

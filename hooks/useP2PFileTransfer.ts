@@ -29,6 +29,10 @@ export function useP2PFileTransfer(signalingUrl: string) {
   const [sendProgress, setSendProgress] = useState(0);
   const [receiveProgress, setReceiveProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const [isCancelled, setIsCancelled] = useState(false);
+  const [reconnectAttempts, setReconnectAttempts] = useState(0);
+  const [isReconnecting, setIsReconnecting] = useState(false);
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
@@ -36,6 +40,9 @@ export function useP2PFileTransfer(signalingUrl: string) {
   const roomIdRef = useRef<string | null>(null);
   const localDeviceNameRef = useRef<string | null>(null);
   const sessionSecretRef = useRef<string | null>(null);
+  const currentTransferRef = useRef<{ reader?: any; file?: File } | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const maxReconnectAttempts = 5;
 
   // helper: compute verification code from sessionSecret
   async function computeVerifyCode(secret: string) {
@@ -88,16 +95,68 @@ export function useP2PFileTransfer(signalingUrl: string) {
       }
     });
     client.on('joiner-left', () => {
-      cleanup();
+      if (!isReconnecting && reconnectAttempts < maxReconnectAttempts) {
+        attemptReconnect();
+      } else {
+        cleanup();
+      }
     });
     client.on('host-left', () => {
-      cleanup();
+      if (!isReconnecting && reconnectAttempts < maxReconnectAttempts) {
+        attemptReconnect();
+      } else {
+        cleanup();
+      }
     });
+    client.on('close', () => {
+      if (!isReconnecting && connectionState !== 'disconnected' && reconnectAttempts < maxReconnectAttempts) {
+        attemptReconnect();
+      }
+    });
+  }
+  
+  function attemptReconnect() {
+    if (isReconnecting || !roomIdRef.current || !localDeviceNameRef.current) return;
+    
+    setIsReconnecting(true);
+    setReconnectAttempts(prev => prev + 1);
+    setError('Connection lost. Reconnecting...');
+    
+    const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000); // Exponential backoff, max 30s
+    
+    reconnectTimeoutRef.current = setTimeout(() => {
+      setError(`Reconnecting... (Attempt ${reconnectAttempts + 1}/${maxReconnectAttempts})`);
+      
+      // Attempt to reconnect
+      cleanup();
+      createSignaling();
+      
+      // Try to rejoin the room
+      setTimeout(() => {
+        if (roomIdRef.current && localDeviceNameRef.current) {
+          joinRoom(roomIdRef.current, localDeviceNameRef.current)
+            .then(() => {
+              setIsReconnecting(false);
+              setReconnectAttempts(0);
+              setError(null);
+            })
+            .catch(() => {
+              setIsReconnecting(false);
+              if (reconnectAttempts + 1 >= maxReconnectAttempts) {
+                setError('Failed to reconnect. Please refresh the page.');
+              }
+            });
+        }
+      }, 1000);
+    }, delay);
   }
 
   useEffect(() => {
     createSignaling();
     return () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
       cleanup();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -178,7 +237,7 @@ export function useP2PFileTransfer(signalingUrl: string) {
             setReceiveProgress(0);
           } else if (msg.type === 'file-end') {
             // assemble
-            const blob = new Blob(incomingBuffers, { type: expectedFileMeta?.mime || 'application/octet-stream' });
+            const blob = new Blob(incomingBuffers as BlobPart[], { type: expectedFileMeta?.mime || 'application/octet-stream' });
             const id = String(Date.now());
             const rf = { id, name: expectedFileMeta.name, size: expectedFileMeta.size, mime: expectedFileMeta.mime, blob };
             setReceivedFiles((s) => [rf, ...s]);
@@ -237,37 +296,87 @@ export function useP2PFileTransfer(signalingUrl: string) {
 
   async function sendFile(file: File) {
     if (!dcRef.current || dcRef.current.readyState !== 'open') throw new Error('Data channel not open');
+    
+    // Reset control flags
+    setIsPaused(false);
+    setIsCancelled(false);
+    setSendProgress(0);
+    
     // send meta
     const meta = { name: file.name, size: file.size, mime: file.type };
     dcRef.current.send(JSON.stringify({ type: 'file-meta', meta }));
+    
     const reader = file.stream().getReader();
+    currentTransferRef.current = { reader, file };
     let sent = 0;
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (value) {
-        // chunk into CHUNK_SIZE pieces
-        let offset = 0;
-        while (offset < value.length) {
-          const end = Math.min(offset + CHUNK_SIZE, value.length);
-          const slice = value.slice(offset, end);
-          dcRef.current.send(slice.buffer);
-          sent += slice.length;
-          setSendProgress(Math.min(100, Math.round((sent / file.size) * 100)));
-          offset = end;
-          // small yield to avoid blocking
-          await new Promise((r) => setTimeout(r, 0));
+    
+    try {
+      while (true) {
+        // Check for cancellation
+        if (isCancelled) {
+          dcRef.current.send(JSON.stringify({ type: 'file-cancelled' }));
+          throw new Error('Transfer cancelled');
+        }
+        
+        // Wait while paused
+        while (isPaused && !isCancelled) {
+          await new Promise((r) => setTimeout(r, 100));
+        }
+        
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        if (value) {
+          // chunk into CHUNK_SIZE pieces
+          let offset = 0;
+          while (offset < value.length) {
+            // Check pause/cancel during chunking
+            if (isCancelled) {
+              dcRef.current.send(JSON.stringify({ type: 'file-cancelled' }));
+              throw new Error('Transfer cancelled');
+            }
+            
+            while (isPaused && !isCancelled) {
+              await new Promise((r) => setTimeout(r, 100));
+            }
+            
+            const end = Math.min(offset + CHUNK_SIZE, value.length);
+            const slice = value.slice(offset, end);
+            dcRef.current.send(slice.buffer);
+            sent += slice.length;
+            setSendProgress(Math.min(100, Math.round((sent / file.size) * 100)));
+            offset = end;
+            // small yield to avoid blocking
+            await new Promise((r) => setTimeout(r, 0));
+          }
         }
       }
+      
+      dcRef.current.send(JSON.stringify({ type: 'file-end' }));
+      setSendProgress(100);
+      
+      // record history (not storing file payloads)
+      try {
+        const hist = JSON.parse(localStorage.getItem('nearby:history') || '[]');
+        hist.unshift({ id: Date.now(), type: 'sent', name: file.name, size: file.size, when: Date.now() });
+        localStorage.setItem('nearby:history', JSON.stringify(hist.slice(0, 50)));
+      } catch (e) {}
+    } finally {
+      currentTransferRef.current = null;
     }
-    dcRef.current.send(JSON.stringify({ type: 'file-end' }));
-    setSendProgress(100);
-    // record history (not storing file payloads)
-    try {
-      const hist = JSON.parse(localStorage.getItem('nearby:history') || '[]');
-      hist.unshift({ id: Date.now(), type: 'sent', name: file.name, size: file.size, when: Date.now() });
-      localStorage.setItem('nearby:history', JSON.stringify(hist.slice(0, 50)));
-    } catch (e) {}
+  }
+  
+  function pauseTransfer() {
+    setIsPaused(true);
+  }
+  
+  function resumeTransfer() {
+    setIsPaused(false);
+  }
+  
+  function cancelTransfer() {
+    setIsCancelled(true);
+    setSendProgress(0);
   }
 
   return {
@@ -283,6 +392,14 @@ export function useP2PFileTransfer(signalingUrl: string) {
     createRoom,
     joinRoom,
     confirmVerification,
+    pauseTransfer,
+    resumeTransfer,
+    cancelTransfer,
+    isPaused,
+    isCancelled,
+    isReconnecting,
+    reconnectAttempts,
+    dataChannel: dcRef.current,
   } as const;
 }
 

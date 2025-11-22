@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState } from 'react';
 import HostPanel from '../../components/nearby/HostPanel';
 import JoinPanel from '../../components/nearby/JoinPanel';
