@@ -24,15 +24,19 @@ export function FilePreview({ file, onRemove }: FilePreviewProps) {
     // Generate preview for images
     if (file.type.startsWith('image/')) {
       const reader = new FileReader();
+      let currentPreview: string | null = null;
+      
       reader.onload = (e) => {
-        setPreview(e.target?.result as string);
+        currentPreview = e.target?.result as string;
+        setPreview(currentPreview);
       };
       reader.readAsDataURL(file);
 
       return () => {
-        if (preview) {
-          URL.revokeObjectURL(preview);
-        }
+        // Clean up the preview URL if it was an object URL
+        // Note: FileReader.readAsDataURL creates data URLs, not object URLs
+        // so no cleanup is needed, but we reset state
+        setPreview(null);
       };
     }
   }, [file]);

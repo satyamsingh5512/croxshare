@@ -5,6 +5,11 @@
  * Compress files before P2P transfer to reduce bandwidth and time
  */
 
+// Check if CompressionStream is supported
+export function isCompressionSupported(): boolean {
+  return typeof CompressionStream !== 'undefined' && typeof DecompressionStream !== 'undefined';
+}
+
 // Compression using browser's native CompressionStream API
 export async function compressFile(file: File): Promise<{ 
   compressedBlob: Blob; 
@@ -16,6 +21,17 @@ export async function compressFile(file: File): Promise<{
   const startTime = performance.now();
   
   try {
+    // Check if compression is supported
+    if (!isCompressionSupported()) {
+      return {
+        compressedBlob: file,
+        originalSize: file.size,
+        compressedSize: file.size,
+        ratio: 1,
+        compressionTime: performance.now() - startTime,
+      };
+    }
+    
     // Check if file is already compressed (images, videos, archives)
     const ext = file.name.split('.').pop()?.toLowerCase();
     const alreadyCompressed = ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mp3', 'zip', 'rar', '7z', 'gz'].includes(ext || '');

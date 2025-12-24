@@ -33,22 +33,14 @@ if ! lsof -ti:8080 > /dev/null; then
     exit 1
 fi
 
+# Cleanup on exit
+trap "echo ''; echo '🛑 Shutting down...'; kill $SIGNALING_PID 2>/dev/null; echo '✓ Servers stopped'; exit" INT TERM EXIT
+
 # Start Next.js dev server
 echo "🌐 Starting Next.js development server..."
-echo "   Please wait..."
-echo ""
-npm run dev
-
-# Cleanup on exit
-trap "echo ''; echo '🛑 Shutting down...'; kill $SIGNALING_PID 2>/dev/null; echo '✓ Servers stopped'; exit" INT TERM
-
-# Start Next.js dev server
-echo "⚡ Starting Next.js on port 3000..."
 echo ""
 echo "   🌐 Open: http://localhost:3000"
+echo "   📱 Nebay Pro: http://localhost:3000/nebay-pro"
 echo "   📱 Nearby Share: http://localhost:3000/nearby-share"
 echo ""
 npm run dev
-
-# Cleanup on exit
-trap "kill $SIGNALING_PID 2>/dev/null" EXIT

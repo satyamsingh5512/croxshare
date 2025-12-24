@@ -43,6 +43,10 @@ export function useP2PFileTransfer(signalingUrl: string) {
   const currentTransferRef = useRef<{ reader?: any; file?: File } | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const maxReconnectAttempts = 5;
+  
+  // Refs for pause/cancel state to ensure they work in async functions
+  const isPausedRef = useRef(false);
+  const isCancelledRef = useRef(false);
 
   // helper: compute verification code from sessionSecret
   async function computeVerifyCode(secret: string) {
@@ -246,7 +250,15 @@ export function useP2PFileTransfer(signalingUrl: string) {
             incomingBuffers = [];
             receivedBytes = 0;
             setReceiveProgress(0);
+          } else if (msg.type === 'ping') {
+            // Respond to ping with pong for RTT measurement
+            try {
+              dc.send(JSON.stringify({ type: 'pong' }));
+            } catch (e) {
+              // Ignore send errors
+            }
           }
+          // pong messages are handled by useConnectionQuality hook
         } catch (e) {
           console.warn('Invalid control message', e);
         }
@@ -300,6 +312,8 @@ export function useP2PFileTransfer(signalingUrl: string) {
     // Reset control flags
     setIsPaused(false);
     setIsCancelled(false);
+    isPausedRef.current = false;
+    isCancelledRef.current = false;
     setSendProgress(0);
     
     // send meta
@@ -312,14 +326,14 @@ export function useP2PFileTransfer(signalingUrl: string) {
     
     try {
       while (true) {
-        // Check for cancellation
-        if (isCancelled) {
+        // Check for cancellation using ref
+        if (isCancelledRef.current) {
           dcRef.current.send(JSON.stringify({ type: 'file-cancelled' }));
           throw new Error('Transfer cancelled');
         }
         
-        // Wait while paused
-        while (isPaused && !isCancelled) {
+        // Wait while paused using ref
+        while (isPausedRef.current && !isCancelledRef.current) {
           await new Promise((r) => setTimeout(r, 100));
         }
         
@@ -330,13 +344,13 @@ export function useP2PFileTransfer(signalingUrl: string) {
           // chunk into CHUNK_SIZE pieces
           let offset = 0;
           while (offset < value.length) {
-            // Check pause/cancel during chunking
-            if (isCancelled) {
+            // Check pause/cancel during chunking using refs
+            if (isCancelledRef.current) {
               dcRef.current.send(JSON.stringify({ type: 'file-cancelled' }));
               throw new Error('Transfer cancelled');
             }
             
-            while (isPaused && !isCancelled) {
+            while (isPausedRef.current && !isCancelledRef.current) {
               await new Promise((r) => setTimeout(r, 100));
             }
             
@@ -367,14 +381,17 @@ export function useP2PFileTransfer(signalingUrl: string) {
   }
   
   function pauseTransfer() {
+    isPausedRef.current = true;
     setIsPaused(true);
   }
   
   function resumeTransfer() {
+    isPausedRef.current = false;
     setIsPaused(false);
   }
   
   function cancelTransfer() {
+    isCancelledRef.current = true;
     setIsCancelled(true);
     setSendProgress(0);
   }
