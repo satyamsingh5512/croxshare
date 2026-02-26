@@ -55,11 +55,12 @@ export default function HostPanel() {
                 Copy Link
               </button>
             </div>
+            <div className="mt-1 text-xs text-[#9CA3AF]">Share this link or QR code with the receiving device</div>
             <div className="mt-3 text-sm text-[#4B5563]">Status: {p2p.connectionState === 'connecting' ? 'Waiting for connection…' : p2p.connectionState}</div>
           </div>
 
           {/* QR Code */}
-          <QRCodeDisplay url={`${typeof window !== 'undefined' ? window.location.origin : ''}/nearby-share?room=${roomCode}`} />
+          <QRCodeDisplay url={`${typeof window !== 'undefined' ? window.location.origin : ''}/?room=${roomCode}`} />
 
           {p2p.connectionState !== 'verified' && (
             <VerificationCard peerName={p2p.peerDeviceName} code={p2p.verifyCode ?? null} onConfirm={async () => { await p2p.confirmVerification(); }} />

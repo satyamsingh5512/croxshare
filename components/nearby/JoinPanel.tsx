@@ -8,9 +8,9 @@ const SIGNALING_URL =
   process.env.NEXT_PUBLIC_SIGNALING_URL ||
   'ws://localhost:8080';
 
-export default function JoinPanel() {
+export default function JoinPanel({ initialRoom }: { initialRoom?: string }) {
   const p2p = useP2PFileTransfer(SIGNALING_URL);
-  const [room, setRoom] = useState('');
+  const [room, setRoom] = useState(initialRoom || '');
 
   async function join() {
     const code = room.replace(/[^0-9]/g, '').slice(0, 6);
