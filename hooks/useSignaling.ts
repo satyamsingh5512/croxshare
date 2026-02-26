@@ -9,8 +9,8 @@
  */
 
 import { useEffect, useRef, useCallback } from 'react';
-import type { PresenceChannel } from 'pusher-js';
 import type { SignalMessage } from '@/types';
+import { SignalingClient } from '@/lib/signaling';
 
 interface UseSignalingOptions {
   roomId: string | null;
@@ -29,17 +29,20 @@ export function useSignaling({
   onSignal,
   onSocketId,
 }: UseSignalingOptions) {
-  const channelRef = useRef<PresenceChannel | null>(null);
-  const socketIdRef = useRef<string | null>(null);
+  const signalingRef = useRef<SignalingClient | null>(null);
+  const myIdRef = useRef<string>('');
+
+  if (!myIdRef.current) {
+    const random = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    myIdRef.current = `peer-${random}`;
+  }
 
   const sendSignal = useCallback(
     async (type: SignalMessage['type'], data: SignalMessage['data']) => {
-      if (!roomId || !socketIdRef.current) return;
-      await fetch('/api/signal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roomId, type, data, from: socketIdRef.current }),
-      });
+      if (!roomId || !myIdRef.current || !signalingRef.current) return;
+      await signalingRef.current.sendSignal(roomId, myIdRef.current, type, data);
     },
     [roomId],
   );
@@ -47,63 +50,23 @@ export function useSignaling({
   useEffect(() => {
     if (!roomId) return;
 
-    // Dynamically import Pusher client (browser-only)
-    let cancelled = false;
-
-    (async () => {
-      const { getPusherClient } = await import('@/lib/pusher-client');
-      if (cancelled) return;
-
-      const pusher = getPusherClient();
-
-      // Pass user info via auth payload — the API route reads these
-      (pusher.config as any).auth = {
-        headers: { 'Content-Type': 'application/json' },
-        params: { user_id: pusher.sessionID, user_name: myName },
-      };
-
-      const channelName = `presence-room-${roomId}`;
-      const channel = pusher.subscribe(channelName) as PresenceChannel;
-      channelRef.current = channel;
-
-      channel.bind('pusher:subscription_succeeded', (members: any) => {
-        const id = String(pusher.sessionID);
-        socketIdRef.current = id;
-        onSocketId(id);
-
-        // If there's already exactly one other member → they joined before us
-        const others: any[] = [];
-        members.each((m: any) => {
-          if (m.id !== id) others.push(m);
-        });
-        if (others.length === 1) {
-          const peer = others[0];
-          onPeerJoined(peer.id, peer.info?.name || 'Unknown device');
-        }
-      });
-
-      channel.bind('pusher:member_added', (member: any) => {
-        onPeerJoined(member.id, member.info?.name || 'Unknown device');
-      });
-
-      channel.bind('pusher:member_removed', () => {
-        onPeerLeft();
-      });
-
-      channel.bind('signal', (msg: SignalMessage) => {
-        // Ignore signals we sent ourselves
-        if (msg.from === socketIdRef.current) return;
-        onSignal(msg);
-      });
-    })();
+    const signaling = new SignalingClient();
+    signalingRef.current = signaling;
+    signaling.join({
+      roomId,
+      myId: myIdRef.current,
+      myName,
+      onReady: (id) => onSocketId(id),
+      onPeerJoined,
+      onPeerLeft,
+      onSignal,
+    });
 
     return () => {
-      cancelled = true;
-      channelRef.current?.unsubscribe();
-      channelRef.current = null;
+      signalingRef.current?.leave();
+      signalingRef.current = null;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomId]);
+  }, [roomId, myName, onPeerJoined, onPeerLeft, onSignal, onSocketId]);
 
   return { sendSignal };
 }

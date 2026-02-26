@@ -2,24 +2,19 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-
-function generateCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-}
+import { generateRoomCode, normalizeRoomCode } from '@/lib/utils';
 
 export default function HomePage() {
   const router = useRouter();
   const [joinCode, setJoinCode] = useState('');
-  const [joining, setJoining] = useState(false);
 
   function create() {
-    const code = generateCode();
+    const code = generateRoomCode();
     router.push(`/room/${code}`);
   }
 
   function join() {
-    const code = joinCode.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+    const code = normalizeRoomCode(joinCode);
     if (code.length !== 6) return;
     router.push(`/room/${code}`);
   }
@@ -59,7 +54,7 @@ export default function HomePage() {
           <p className="mt-1 text-sm text-gray-500">Enter the 6-character code from the sender.</p>
           <input
             value={joinCode}
-            onChange={(e) => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
+            onChange={(e) => setJoinCode(normalizeRoomCode(e.target.value))}
             onKeyDown={(e) => e.key === 'Enter' && join()}
             placeholder="ABC-123"
             maxLength={6}

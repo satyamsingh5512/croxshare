@@ -15,6 +15,7 @@ import { useRef, useState, useCallback } from 'react';
 import { createPeerConnection } from '@/lib/webrtc';
 import { chunkFile, reassemble, downloadBlob, CHUNK_SIZE } from '@/lib/file-chunker';
 import type { SignalMessage, FileMetadata, IncomingFile } from '@/types';
+import { useTransferStore } from '@/store/useTransferStore';
 
 interface UseFileTransferOptions {
   sendSignal: (type: SignalMessage['type'], data: SignalMessage['data']) => Promise<void>;
@@ -29,6 +30,10 @@ export function useFileTransfer({ sendSignal, onConnected, onDisconnected }: Use
 
   const [sendProgress, setSendProgress] = useState(0);
   const [incomingFiles, setIncomingFiles] = useState<IncomingFile[]>([]);
+  const setStoreSendProgress = useTransferStore((state) => state.setSendProgress);
+  const upsertTransfer = useTransferStore((state) => state.upsertTransfer);
+  const updateTransferProgress = useTransferStore((state) => state.updateTransferProgress);
+  const markTransferDone = useTransferStore((state) => state.markTransferDone);
 
   // ── DataChannel setup ─────────────────────────────────────────────────
 
@@ -55,6 +60,14 @@ export function useFileTransfer({ sendSignal, onConnected, onDisconnected }: Use
             done: false,
           };
           setIncomingFiles((prev) => [current!, ...prev]);
+          upsertTransfer({
+            id: msg.meta.id,
+            name: msg.meta.name,
+            size: msg.meta.size,
+            direction: 'receiving',
+            progress: 0,
+            status: 'active',
+          });
         } else if (msg.type === 'file-end' && current) {
           const blob = reassemble(current.buffers, current.meta.mime);
           current.blob = blob;
@@ -64,6 +77,7 @@ export function useFileTransfer({ sendSignal, onConnected, onDisconnected }: Use
               f.meta.id === current!.meta.id ? { ...f, blob, done: true } : f,
             ),
           );
+          markTransferDone(current.meta.id);
           downloadBlob(blob, current.meta.name);
           current = null;
         }
@@ -79,6 +93,7 @@ export function useFileTransfer({ sendSignal, onConnected, onDisconnected }: Use
             f.meta.id === current!.meta.id ? { ...f, receivedChunks: current!.receivedChunks } : f,
           ),
         );
+        updateTransferProgress(current.meta.id, pct);
         void pct; // suppress unused warning (progress is derived in component)
       }
     };
@@ -171,6 +186,15 @@ export function useFileTransfer({ sendSignal, onConnected, onDisconnected }: Use
 
     dc.send(JSON.stringify({ type: 'file-meta', meta }));
     setSendProgress(0);
+    setStoreSendProgress(0);
+    upsertTransfer({
+      id,
+      name: file.name,
+      size: file.size,
+      direction: 'sending',
+      progress: 0,
+      status: 'active',
+    });
 
     let sent = 0;
     for await (const { data, index } of chunkFile(file)) {
@@ -180,11 +204,16 @@ export function useFileTransfer({ sendSignal, onConnected, onDisconnected }: Use
       }
       dc.send(data);
       sent = index + 1;
-      setSendProgress(Math.min(99, Math.round((sent / chunks) * 100)));
+      const progress = Math.min(99, Math.round((sent / chunks) * 100));
+      setSendProgress(progress);
+      setStoreSendProgress(progress);
+      updateTransferProgress(id, progress);
     }
 
     dc.send(JSON.stringify({ type: 'file-end' }));
     setSendProgress(100);
+    setStoreSendProgress(100);
+    markTransferDone(id);
   }, []);
 
   function cleanup() {
