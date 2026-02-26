@@ -1,116 +1,98 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import HostPanel from '../components/nearby/HostPanel';
-import JoinPanel from '../components/nearby/JoinPanel';
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
-type Mode = 'home' | 'send' | 'receive';
+function generateCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
 
 export default function HomePage() {
-  const [mode, setMode] = useState<Mode>('home');
-  const [autoRoom, setAutoRoom] = useState<string | null>(null);
+  const router = useRouter();
+  const [joinCode, setJoinCode] = useState('');
+  const [joining, setJoining] = useState(false);
 
-  // If URL contains ?room=xxx automatically open the receive flow
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const room = params.get('room');
-    if (room) {
-      setAutoRoom(room);
-      setMode('receive');
-    }
-  }, []);
+  function create() {
+    const code = generateCode();
+    router.push(`/room/${code}`);
+  }
+
+  function join() {
+    const code = joinCode.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+    if (code.length !== 6) return;
+    router.push(`/room/${code}`);
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 font-[var(--font-inter)]">
-      {/* Header */}
-      <header className="border-b border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600">
-              <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5 text-white" stroke="currentColor" strokeWidth="2">
-                <path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2" />
-                <rect x="8" y="8" width="12" height="12" rx="2" />
-              </svg>
-            </div>
-            <span className="text-lg font-semibold text-gray-900">Croxshare</span>
-          </div>
-          {mode !== 'home' && (
-            <button
-              onClick={() => { setMode('home'); setAutoRoom(null); }}
-              className="text-sm text-gray-500 hover:text-gray-800"
-            >
-              &larr; Back
-            </button>
-          )}
+    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4 py-12">
+      {/* Logo */}
+      <div className="mb-8 flex items-center gap-3">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-600 shadow-lg">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-7 w-7 text-white">
+            <path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2" />
+            <rect x="8" y="8" width="12" height="12" rx="2" />
+          </svg>
         </div>
-      </header>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Croxshare</h1>
+          <p className="text-sm text-gray-500">Instant P2P file sharing</p>
+        </div>
+      </div>
 
-      {/* Main content */}
-      <main className="mx-auto max-w-3xl px-4 py-10">
-        {mode === 'home' && (
-          <>
-            <div className="mb-10 text-center">
-              <h1 className="text-3xl font-bold text-gray-900">Share files over your local WiFi</h1>
-              <p className="mt-3 text-gray-500">No login. No cloud. Files go directly device-to-device.</p>
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <button
-                onClick={() => setMode('send')}
-                className="group flex flex-col items-start gap-3 rounded-2xl border border-gray-200 bg-white p-6 text-left shadow-sm transition hover:border-indigo-300 hover:shadow-md"
-              >
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6">
-                    <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1" />
-                    <polyline points="16 6 12 2 8 6" />
-                    <line x1="12" y1="2" x2="12" y2="15" />
-                  </svg>
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-900">Send Files</div>
-                  <div className="mt-1 text-sm text-gray-500">Share a code or QR — receiver joins you</div>
-                </div>
-              </button>
-              <button
-                onClick={() => setMode('receive')}
-                className="group flex flex-col items-start gap-3 rounded-2xl border border-gray-200 bg-white p-6 text-left shadow-sm transition hover:border-indigo-300 hover:shadow-md"
-              >
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6">
-                    <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1" />
-                    <polyline points="8 12 12 16 16 12" />
-                    <line x1="12" y1="2" x2="12" y2="15" />
-                  </svg>
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-900">Receive Files</div>
-                  <div className="mt-1 text-sm text-gray-500">Enter a code from the sender to connect</div>
-                </div>
-              </button>
-            </div>
+      <div className="w-full max-w-sm space-y-4">
+        {/* Create room */}
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="font-semibold text-gray-900">Send files</h2>
+          <p className="mt-1 text-sm text-gray-500">Create a room and share the code with the receiver.</p>
+          <button
+            onClick={create}
+            className="mt-4 w-full rounded-xl bg-indigo-600 py-3 text-sm font-semibold text-white hover:bg-indigo-700 transition"
+          >
+            Create Room
+          </button>
+        </div>
 
-            {/* How it works */}
-            <div className="mt-12">
-              <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">How it works</h2>
-              <div className="grid gap-3 sm:grid-cols-3">
-                {[
-                  { step: '1', title: 'Open on both devices', desc: 'Both devices must be on the same WiFi network.' },
-                  { step: '2', title: 'Share the code', desc: 'Sender gets a 6-digit code — receiver enters it.' },
-                  { step: '3', title: 'Verify &amp; transfer', desc: 'Match the security code and drop your files.' },
-                ].map((s) => (
-                  <div key={s.step} className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-                    <div className="mb-2 flex h-7 w-7 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-600">{s.step}</div>
-                    <div className="font-medium text-gray-800">{s.title}</div>
-                    <div className="mt-1 text-sm text-gray-500" dangerouslySetInnerHTML={{ __html: s.desc }} />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
+        {/* Join room */}
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="font-semibold text-gray-900">Receive files</h2>
+          <p className="mt-1 text-sm text-gray-500">Enter the 6-character code from the sender.</p>
+          <input
+            value={joinCode}
+            onChange={(e) => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
+            onKeyDown={(e) => e.key === 'Enter' && join()}
+            placeholder="ABC-123"
+            maxLength={6}
+            className="mt-4 w-full rounded-xl border border-gray-200 px-4 py-3 text-center text-lg font-bold tracking-widest text-gray-900 placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+          <button
+            onClick={join}
+            disabled={joinCode.length !== 6}
+            className="mt-3 w-full rounded-xl bg-gray-900 py-3 text-sm font-semibold text-white hover:bg-gray-800 disabled:opacity-40 transition"
+          >
+            Join Room
+          </button>
+        </div>
+      </div>
 
-        {mode === 'send' && <HostPanel />}
-        {mode === 'receive' && <JoinPanel initialRoom={autoRoom ?? undefined} />}
-      </main>
+      {/* How it works */}
+      <div className="mt-12 grid max-w-sm gap-3 sm:grid-cols-3 sm:max-w-2xl">
+        {[
+          { n: '1', t: 'Create a room', d: 'Click "Create Room" on the sending device.' },
+          { n: '2', t: 'Share the code', d: 'The receiver enters the 6-char code or scans QR.' },
+          { n: '3', t: 'Transfer directly', d: 'Files go browser → browser. Nothing touches a server.' },
+        ].map((s) => (
+          <div key={s.n} className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div className="mb-2 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-600">{s.n}</div>
+            <p className="text-sm font-medium text-gray-800">{s.t}</p>
+            <p className="mt-0.5 text-xs text-gray-500">{s.d}</p>
+          </div>
+        ))}
+      </div>
+
+      <p className="mt-10 text-xs text-gray-400">
+        No login · No cloud · Files never leave your browser
+      </p>
     </div>
   );
 }
