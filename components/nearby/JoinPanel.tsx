@@ -6,7 +6,7 @@ import FileProgress from './FileProgress';
 const SIGNALING_URL =
   (typeof window !== 'undefined' && (window as any).__SIGNALING_URL) ||
   process.env.NEXT_PUBLIC_SIGNALING_URL ||
-  'ws://localhost:8080';
+  '/api/signal';
 
 export default function JoinPanel({ initialRoom }: { initialRoom?: string }) {
   const p2p = useP2PFileTransfer(SIGNALING_URL);

@@ -9,7 +9,7 @@ import QRCodeDisplay from './QRCodeDisplay';
 const SIGNALING_URL =
   (typeof window !== 'undefined' && (window as any).__SIGNALING_URL) ||
   process.env.NEXT_PUBLIC_SIGNALING_URL ||
-  'ws://localhost:8080';
+  '/api/signal';
 
 function formatRoom(code: string) {
   return code.replace(/(\d{3})(\d{3})/, '$1-$2');
