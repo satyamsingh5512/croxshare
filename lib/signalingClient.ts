@@ -96,7 +96,9 @@ export class SignalingClient {
 
   private startPolling(roomId: string, role: 'host' | 'joiner') {
     this.stopPolling();
-    this.lastPollTs = Date.now();
+    // Use 0 so the first poll fetches ALL signals from the start of the room.
+    // Without this the joiner misses the host's offer (sent before joiner joined).
+    this.lastPollTs = 0;
     this.joinerArrivedEmitted = false;
     this.pollTimer = setInterval(() => this.poll(roomId, role), 300);
   }
