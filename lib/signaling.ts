@@ -18,7 +18,6 @@ export class SignalingClient {
   join(options: JoinOptions) {
     const pusher = getPusherClient();
     (pusher.config as any).auth = {
-      headers: { 'Content-Type': 'application/json' },
       params: { user_id: options.myId, user_name: options.myName },
     };
 
@@ -67,7 +66,9 @@ export class SignalingClient {
   }
 
   leave() {
-    this.channel?.unsubscribe();
+    if (this.channel) {
+      getPusherClient().unsubscribe(this.channel.name);
+    }
     this.channel = null;
   }
 }

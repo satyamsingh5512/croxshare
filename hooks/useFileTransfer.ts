@@ -27,6 +27,8 @@ export function useFileTransfer({ sendSignal, onConnected, onDisconnected }: Use
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
   const isHostRef = useRef(false);
+  const pendingIceCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
+  const hostStartedRef = useRef(false);
 
   const [sendProgress, setSendProgress] = useState(0);
   const [incomingFiles, setIncomingFiles] = useState<IncomingFile[]>([]);
@@ -119,12 +121,26 @@ export function useFileTransfer({ sendSignal, onConnected, onDisconnected }: Use
     };
   }
 
+  async function flushPendingIceCandidates(pc: RTCPeerConnection) {
+    if (pendingIceCandidatesRef.current.length === 0) return;
+
+    const queuedCandidates = [...pendingIceCandidatesRef.current];
+    pendingIceCandidatesRef.current = [];
+
+    for (const candidate of queuedCandidates) {
+      await pc.addIceCandidate(new RTCIceCandidate(candidate));
+    }
+  }
+
   // ── Called when we are the initiator (host, after peer joins) ─────────
 
   const startAsHost = useCallback(async () => {
+    if (hostStartedRef.current || pcRef.current) return;
+
     const pc = createPeerConnection();
     pcRef.current = pc;
     isHostRef.current = true;
+    hostStartedRef.current = true;
     setupPeerConnection(pc);
 
     const dc = pc.createDataChannel('files', { ordered: true });
@@ -142,22 +158,33 @@ export function useFileTransfer({ sendSignal, onConnected, onDisconnected }: Use
     async (msg: SignalMessage) => {
       try {
         if (msg.type === 'offer') {
-          const pc = createPeerConnection();
+          const pc = pcRef.current ?? createPeerConnection();
           pcRef.current = pc;
           isHostRef.current = false;
           setupPeerConnection(pc);
 
           await pc.setRemoteDescription(new RTCSessionDescription(msg.data as RTCSessionDescriptionInit));
+          await flushPendingIceCandidates(pc);
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
           await sendSignal('answer', answer);
         } else if (msg.type === 'answer') {
-          await pcRef.current?.setRemoteDescription(
+          if (!pcRef.current) return;
+
+          await pcRef.current.setRemoteDescription(
             new RTCSessionDescription(msg.data as RTCSessionDescriptionInit),
           );
+          await flushPendingIceCandidates(pcRef.current);
         } else if (msg.type === 'ice') {
-          const candidate = new RTCIceCandidate(msg.data as RTCIceCandidateInit);
-          await pcRef.current?.addIceCandidate(candidate);
+          const candidate = msg.data as RTCIceCandidateInit;
+          const pc = pcRef.current;
+
+          if (!pc || !pc.remoteDescription) {
+            pendingIceCandidatesRef.current.push(candidate);
+            return;
+          }
+
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
         }
       } catch (err) {
         console.error('[WebRTC signal error]', err);
@@ -221,6 +248,8 @@ export function useFileTransfer({ sendSignal, onConnected, onDisconnected }: Use
     pcRef.current?.close();
     pcRef.current = null;
     dcRef.current = null;
+    pendingIceCandidatesRef.current = [];
+    hostStartedRef.current = false;
   }
 
   return {
