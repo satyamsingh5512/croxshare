@@ -9,7 +9,11 @@ export function getPusherClient(): PusherJS {
     cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
     // Presence channels require server auth — this is our API route.
     authEndpoint: '/api/signal',
-    auth: { headers: { 'Content-Type': 'application/json' } },
+    auth: {},
+    channelAuthorization: {
+      endpoint: '/api/signal',
+      transport: 'ajax',
+    } as any,
   });
   return client;
 }

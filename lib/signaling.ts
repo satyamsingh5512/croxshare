@@ -10,6 +10,7 @@ interface JoinOptions {
   onPeerJoined: (peerId: string, peerName: string) => void;
   onPeerLeft: () => void;
   onSignal: (msg: SignalMessage) => void;
+  onError?: (message: string) => void;
 }
 
 export class SignalingClient {
@@ -20,10 +21,21 @@ export class SignalingClient {
     (pusher.config as any).auth = {
       params: { user_id: options.myId, user_name: options.myName },
     };
+    (pusher.config as any).channelAuthorization = {
+      ...((pusher.config as any).channelAuthorization || {}),
+      endpoint: '/api/signal',
+      transport: 'ajax',
+      params: { user_id: options.myId, user_name: options.myName },
+    };
 
     const channelName = `presence-room-${options.roomId}`;
     const channel = pusher.subscribe(channelName) as PresenceChannel;
     this.channel = channel;
+
+    pusher.connection.bind('error', (error: any) => {
+      const message = error?.error?.data?.message || error?.error?.message || 'Signaling connection failed';
+      options.onError?.(message);
+    });
 
     channel.bind('pusher:subscription_succeeded', (members: any) => {
       options.onReady(options.myId);
@@ -44,6 +56,10 @@ export class SignalingClient {
 
     channel.bind('pusher:member_removed', () => {
       options.onPeerLeft();
+    });
+
+    channel.bind('pusher:subscription_error', (status: number) => {
+      options.onError?.(`Room subscription failed (${status})`);
     });
 
     channel.bind('signal', (msg: SignalMessage) => {
