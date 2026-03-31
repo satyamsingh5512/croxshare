@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { pusherServer } from '@/lib/pusher-server';
 
+async function readBody(req: NextRequest) {
+  const contentType = req.headers.get('content-type') || '';
+
+  if (contentType.includes('application/json')) {
+    return req.json();
+  }
+
+  const raw = await req.text();
+  return Object.fromEntries(new URLSearchParams(raw).entries());
+}
+
 /**
  * POST /api/signal
  *
@@ -16,7 +27,7 @@ import { pusherServer } from '@/lib/pusher-server';
  */
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await readBody(req);
 
     // ── Pusher presence channel auth ─────────────────────────────────────
     if (body.socket_id && body.channel_name) {

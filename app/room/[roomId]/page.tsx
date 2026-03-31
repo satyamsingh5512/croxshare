@@ -20,9 +20,9 @@ export default function RoomPage() {
   const [nameSet, setNameSet] = useState(false);
   const [status, setStatus] = useState<PeerStatus>('waiting');
   const [peerName, setPeerName] = useState<string | null>(null);
-  const [mySocketId, setMySocketId] = useState<string | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [configError, setConfigError] = useState(false);
+  const mySocketIdRef = React.useRef<string | null>(null);
 
   const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/room/${roomId}` : '';
 
@@ -66,12 +66,13 @@ export default function RoomPage() {
     (peerId: string, name: string) => {
       setPeerName(name);
       setStatus('connecting');
-      // Whoever has a lower socket ID becomes host (creates offer)
-      if (mySocketId && mySocketId < peerId) {
+      // Whoever has a lower peer ID becomes host and creates the offer.
+      const myPeerId = mySocketIdRef.current;
+      if (myPeerId && myPeerId < peerId) {
         startAsHost();
       }
     },
-    [mySocketId, startAsHost],
+    [startAsHost],
   );
 
   const onPeerLeft = useCallback(() => {
@@ -85,7 +86,9 @@ export default function RoomPage() {
     onPeerJoined,
     onPeerLeft,
     onSignal: handleSignal,
-    onSocketId: setMySocketId,
+    onSocketId: (id) => {
+      mySocketIdRef.current = id;
+    },
   });
 
   // Wire sendSignal ref so the file transfer hook can use it
