@@ -22,6 +22,7 @@ export default function RoomPage() {
   const [peerName, setPeerName] = useState<string | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [configError, setConfigError] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const mySocketIdRef = React.useRef<string | null>(null);
 
   const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/room/${roomId}` : '';
@@ -45,8 +46,14 @@ export default function RoomPage() {
     if (saved) { setMyName(saved); setNameSet(true); }
   }, []);
 
-  const onConnected = useCallback(() => setStatus('connected'), []);
-  const onDisconnected = useCallback(() => setStatus('disconnected'), []);
+  const onConnected = useCallback(() => {
+    setStatus('connected');
+    setStatusMessage(null);
+  }, []);
+  const onDisconnected = useCallback(() => {
+    setStatus('disconnected');
+    setStatusMessage(null);
+  }, []);
 
   // We need sendSignal from useSignaling, but useFileTransfer also needs it.
   // Solve with a ref-based forwarder:
@@ -66,6 +73,7 @@ export default function RoomPage() {
     (peerId: string, name: string) => {
       setPeerName(name);
       setStatus('connecting');
+      setStatusMessage(null);
       // Whoever has a lower peer ID becomes host and creates the offer.
       const myPeerId = mySocketIdRef.current;
       if (myPeerId && myPeerId < peerId) {
@@ -78,6 +86,7 @@ export default function RoomPage() {
   const onPeerLeft = useCallback(() => {
     setPeerName(null);
     setStatus('waiting');
+    setStatusMessage(null);
   }, []);
 
   const { sendSignal } = useSignaling({
@@ -88,6 +97,10 @@ export default function RoomPage() {
     onSignal: handleSignal,
     onSocketId: (id) => {
       mySocketIdRef.current = id;
+    },
+    onError: (message) => {
+      setStatus('error');
+      setStatusMessage(message);
     },
   });
 
@@ -169,7 +182,7 @@ export default function RoomPage() {
             {status === 'waiting' && 'Share the code or link above. File transfer starts once the other device joins.'}
             {status === 'connecting' && 'Establishing secure connection…'}
             {status === 'disconnected' && 'The other device disconnected. Ask them to rejoin.'}
-            {status === 'error' && 'Connection failed. Try refreshing the page.'}
+            {status === 'error' && (statusMessage || 'Connection failed. Try refreshing the page.')}
           </div>
         )}
       </main>

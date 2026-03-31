@@ -19,6 +19,7 @@ interface UseSignalingOptions {
   onPeerLeft: () => void;
   onSignal: (msg: SignalMessage) => void;
   onSocketId: (id: string) => void;
+  onError?: (message: string) => void;
 }
 
 export function useSignaling({
@@ -28,6 +29,7 @@ export function useSignaling({
   onPeerLeft,
   onSignal,
   onSocketId,
+  onError,
 }: UseSignalingOptions) {
   const signalingRef = useRef<SignalingClient | null>(null);
   const myIdRef = useRef<string>('');
@@ -60,13 +62,14 @@ export function useSignaling({
       onPeerJoined,
       onPeerLeft,
       onSignal,
+      onError,
     });
 
     return () => {
       signalingRef.current?.leave();
       signalingRef.current = null;
     };
-  }, [roomId, myName, onPeerJoined, onPeerLeft, onSignal, onSocketId]);
+  }, [roomId, myName, onPeerJoined, onPeerLeft, onSignal, onSocketId, onError]);
 
   return { sendSignal };
 }
