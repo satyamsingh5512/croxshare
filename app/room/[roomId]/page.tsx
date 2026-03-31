@@ -27,36 +27,35 @@ export default function RoomPage() {
 
   const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/room/${roomId}` : '';
 
-  // Check Pusher config on mount
   useEffect(() => {
     if (!process.env.NEXT_PUBLIC_PUSHER_KEY || !process.env.NEXT_PUBLIC_PUSHER_CLUSTER) {
       setConfigError(true);
     }
   }, []);
 
-  // Generate QR code
   useEffect(() => {
     if (!shareUrl) return;
     QRCode.toDataURL(shareUrl, { width: 180, margin: 1 }).then(setQrDataUrl).catch(() => {});
   }, [shareUrl]);
 
-  // Load saved name
   useEffect(() => {
     const saved = localStorage.getItem('crox:name');
-    if (saved) { setMyName(saved); setNameSet(true); }
+    if (saved) {
+      setMyName(saved);
+      setNameSet(true);
+    }
   }, []);
 
   const onConnected = useCallback(() => {
     setStatus('connected');
     setStatusMessage(null);
   }, []);
+
   const onDisconnected = useCallback(() => {
     setStatus('disconnected');
     setStatusMessage(null);
   }, []);
 
-  // We need sendSignal from useSignaling, but useFileTransfer also needs it.
-  // Solve with a ref-based forwarder:
   const sendSignalRef = React.useRef<((t: SignalMessage['type'], d: SignalMessage['data']) => Promise<void>) | null>(null);
 
   const wrappedSendSignal = useCallback(
@@ -74,7 +73,6 @@ export default function RoomPage() {
       setPeerName(name);
       setStatus('connecting');
       setStatusMessage(null);
-      // Whoever has a lower peer ID becomes host and creates the offer.
       const myPeerId = mySocketIdRef.current;
       if (myPeerId && myPeerId < peerId) {
         startAsHost();
@@ -104,7 +102,6 @@ export default function RoomPage() {
     },
   });
 
-  // Wire sendSignal ref so the file transfer hook can use it
   useEffect(() => {
     sendSignalRef.current = sendSignal;
   }, [sendSignal]);
@@ -114,26 +111,29 @@ export default function RoomPage() {
   if (configError) {
     return (
       <div className="flex min-h-screen items-center justify-center p-6">
-        <div className="max-w-md rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
-          <p className="font-semibold text-red-800">Pusher not configured</p>
-          <p className="mt-2 text-sm text-red-700">
-            Set <code className="rounded bg-red-100 px-1">NEXT_PUBLIC_PUSHER_KEY</code> and{' '}
-            <code className="rounded bg-red-100 px-1">NEXT_PUBLIC_PUSHER_CLUSTER</code> environment
-            variables in Vercel dashboard or <code className="rounded bg-red-100 px-1">.env.local</code>.
+        <div className="max-w-md rounded-[2rem] border border-rose-200 bg-rose-50/90 p-6 text-center shadow-xl">
+          <p className="font-semibold text-rose-800">Pusher not configured</p>
+          <p className="mt-2 text-sm leading-6 text-rose-700">
+            Set <code className="rounded bg-rose-100 px-1">NEXT_PUBLIC_PUSHER_KEY</code> and{' '}
+            <code className="rounded bg-rose-100 px-1">NEXT_PUBLIC_PUSHER_CLUSTER</code> in your environment.
           </p>
-          <Link href="/" className="mt-4 inline-block text-sm text-indigo-600 underline">← Home</Link>
+          <Link href="/" className="mt-4 inline-block text-sm font-semibold text-rose-700 underline">
+            Back Home
+          </Link>
         </div>
       </div>
     );
   }
 
-  // Name entry screen
   if (!nameSet) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
-        <div className="w-full max-w-sm rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h1 className="text-lg font-semibold text-gray-900">What's your device called?</h1>
-          <p className="mt-1 text-sm text-gray-500">Shown to the other person so they know who's connecting.</p>
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <div className="w-full max-w-md rounded-[2rem] border border-[rgba(102,72,37,0.12)] bg-[rgba(255,252,247,0.86)] p-7 shadow-[0_24px_70px_rgba(92,58,30,0.12)] backdrop-blur">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">Before joining</p>
+          <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-[var(--text)]">What&apos;s your device called?</h1>
+          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+            This label is shown to the other person so they know which device is requesting the transfer.
+          </p>
           <input
             value={myName}
             onChange={(e) => setMyName(e.target.value)}
@@ -145,7 +145,7 @@ export default function RoomPage() {
             }}
             placeholder="e.g. Satyam's Laptop"
             autoFocus
-            className="mt-4 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="mt-6 w-full rounded-[1.2rem] border border-[rgba(102,72,37,0.15)] bg-white/80 px-4 py-4 text-sm text-[var(--text)] focus:border-[var(--accent)] focus:outline-none focus:ring-4 focus:ring-[rgba(184,92,56,0.14)]"
           />
           <button
             onClick={() => {
@@ -154,7 +154,7 @@ export default function RoomPage() {
               setNameSet(true);
             }}
             disabled={!myName.trim()}
-            className="mt-3 w-full rounded-xl bg-indigo-600 py-3 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-40"
+            className="mt-4 w-full rounded-[1.2rem] bg-[linear-gradient(135deg,var(--accent),var(--accent-deep))] py-4 text-sm font-semibold text-white shadow-[0_18px_30px_rgba(143,62,34,0.28)] hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Enter Room
           </button>
@@ -164,25 +164,32 @@ export default function RoomPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <main className="mx-auto max-w-2xl space-y-5 px-4 py-8">
+    <div className="min-h-screen px-4 py-6 sm:px-6">
+      <main className="mx-auto max-w-5xl space-y-5 py-4">
         <RoomHeader roomId={roomId} shareUrl={shareUrl} status={status} peerName={peerName} qrDataUrl={qrDataUrl} />
 
-        {/* Transfer area */}
         {status === 'connected' ? (
-          <>
-            <FileDropZone
-              onFiles={(files) => files.forEach((f) => sendFile(f))}
-            />
-            <TransferList />
+          <section className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
+            <div className="space-y-5">
+              <FileDropZone onFiles={(files) => files.forEach((f) => sendFile(f))} />
+              <TransferList />
+            </div>
             <FileReceiver files={incomingFiles} />
-          </>
+          </section>
         ) : (
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
-            {status === 'waiting' && 'Share the code or link above. File transfer starts once the other device joins.'}
-            {status === 'connecting' && 'Establishing secure connection…'}
-            {status === 'disconnected' && 'The other device disconnected. Ask them to rejoin.'}
-            {status === 'error' && (statusMessage || 'Connection failed. Try refreshing the page.')}
+          <div className="rounded-[1.8rem] border border-[rgba(102,72,37,0.12)] bg-[rgba(255,252,247,0.86)] p-8 text-center shadow-[0_22px_60px_rgba(92,58,30,0.1)] backdrop-blur">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[rgba(184,92,56,0.1)] text-[var(--accent)]">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className="h-7 w-7">
+                <path d="M12 3v6m0 12v-4m9-5h-4M7 12H3m15.364 6.364-2.828-2.828M8.464 8.464 5.636 5.636m12.728 0-2.828 2.828M8.464 15.536l-2.828 2.828" />
+              </svg>
+            </div>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">Room status</p>
+            <div className="mt-3 text-base leading-7 text-[var(--muted)]">
+              {status === 'waiting' && 'Share the code or link above. File transfer starts once the other device joins.'}
+              {status === 'connecting' && 'Establishing secure connection...'}
+              {status === 'disconnected' && 'The other device disconnected. Ask them to rejoin.'}
+              {status === 'error' && (statusMessage || 'Connection failed. Try refreshing the page.')}
+            </div>
           </div>
         )}
       </main>
