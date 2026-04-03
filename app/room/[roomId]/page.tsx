@@ -82,10 +82,11 @@ export default function RoomPage() {
   );
 
   const onPeerLeft = useCallback(() => {
+    cleanup();
     setPeerName(null);
     setStatus('waiting');
     setStatusMessage(null);
-  }, []);
+  }, [cleanup]);
 
   const { sendSignal } = useSignaling({
     roomId: nameSet ? roomId : null,

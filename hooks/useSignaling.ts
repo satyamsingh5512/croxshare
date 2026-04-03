@@ -44,9 +44,15 @@ export function useSignaling({
   const sendSignal = useCallback(
     async (type: SignalMessage['type'], data: SignalMessage['data']) => {
       if (!roomId || !myIdRef.current || !signalingRef.current) return;
-      await signalingRef.current.sendSignal(roomId, myIdRef.current, type, data);
+      try {
+        await signalingRef.current.sendSignal(roomId, myIdRef.current, type, data);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to send signaling message';
+        onError?.(message);
+        throw err;
+      }
     },
-    [roomId],
+    [roomId, onError],
   );
 
   useEffect(() => {
