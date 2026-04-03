@@ -17,15 +17,21 @@ export class SignalingClient {
   private channel: PresenceChannel | null = null;
 
   join(options: JoinOptions) {
-    const pusher = getPusherClient();
-    (pusher.config as any).auth = {
-      params: { user_id: options.myId, user_name: options.myName },
-    };
+    let pusher;
+    try {
+      pusher = getPusherClient();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unable to initialize signaling';
+      options.onError?.(msg);
+      return;
+    }
+
+    // Ensure every auth request carries the latest identity for presence channels.
     (pusher.config as any).channelAuthorization = {
       ...((pusher.config as any).channelAuthorization || {}),
       endpoint: '/api/signal',
       transport: 'ajax',
-      params: { user_id: options.myId, user_name: options.myName },
+      paramsProvider: () => ({ user_id: options.myId, user_name: options.myName }),
     };
 
     const channelName = `presence-room-${options.roomId}`;
@@ -74,11 +80,16 @@ export class SignalingClient {
     type: SignalMessage['type'],
     data: SignalMessage['data'],
   ) {
-    await fetch('/api/signal', {
+    const res = await fetch('/api/signal', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ roomId, type, data, from }),
     });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || `Signal relay failed (${res.status})`);
+    }
   }
 
   leave() {
