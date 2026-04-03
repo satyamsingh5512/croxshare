@@ -137,7 +137,7 @@ export function useFileTransfer({ sendSignal, onConnected, onDisconnected }: Use
   const startAsHost = useCallback(async () => {
     if (hostStartedRef.current || pcRef.current) return;
 
-    const pc = createPeerConnection();
+    const pc = await createPeerConnection();
     pcRef.current = pc;
     isHostRef.current = true;
     hostStartedRef.current = true;
@@ -158,7 +158,7 @@ export function useFileTransfer({ sendSignal, onConnected, onDisconnected }: Use
     async (msg: SignalMessage) => {
       try {
         if (msg.type === 'offer') {
-          const pc = pcRef.current ?? createPeerConnection();
+          const pc = pcRef.current ?? await createPeerConnection();
           pcRef.current = pc;
           isHostRef.current = false;
           setupPeerConnection(pc);
