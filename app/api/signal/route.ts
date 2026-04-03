@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { pusherServer } from '@/lib/pusher-server';
+import { getPusherServer } from '@/lib/pusher-server';
 
 async function readBody(req: NextRequest) {
   const contentType = req.headers.get('content-type') || '';
@@ -27,6 +27,23 @@ async function readBody(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
+    const hasPusherEnv =
+      !!process.env.PUSHER_APP_ID &&
+      !!process.env.PUSHER_SECRET &&
+      !!process.env.NEXT_PUBLIC_PUSHER_KEY &&
+      !!process.env.NEXT_PUBLIC_PUSHER_CLUSTER;
+
+    if (!hasPusherEnv) {
+      return NextResponse.json(
+        {
+          error:
+            'Signaling is not configured. Missing PUSHER_APP_ID, PUSHER_SECRET, NEXT_PUBLIC_PUSHER_KEY, or NEXT_PUBLIC_PUSHER_CLUSTER.',
+        },
+        { status: 500 },
+      );
+    }
+
+    const pusherServer = getPusherServer();
     const body = await readBody(req);
 
     // ── Pusher presence channel auth ─────────────────────────────────────
