@@ -25,7 +25,9 @@ export default function RoomPage() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const mySocketIdRef = React.useRef<string | null>(null);
 
-  const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/room/${roomId}` : '';
+  const configuredOrigin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '');
+  const shareOrigin = configuredOrigin || (typeof window !== 'undefined' ? window.location.origin : '');
+  const shareUrl = shareOrigin ? `${shareOrigin}/room/${roomId}` : '';
 
   useEffect(() => {
     if (!process.env.NEXT_PUBLIC_PUSHER_KEY || !process.env.NEXT_PUBLIC_PUSHER_CLUSTER) {
