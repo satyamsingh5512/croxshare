@@ -25,12 +25,12 @@ export default function FileDropZone({ onFiles, disabled }: Props) {
       onDragLeave={() => setDragging(false)}
       onDrop={(e) => { e.preventDefault(); setDragging(false); handle(e.dataTransfer.files); }}
       onClick={() => !disabled && inputRef.current?.click()}
-      className={`relative overflow-hidden rounded-[1.9rem] border px-6 py-12 text-center shadow-[0_22px_60px_rgba(92,58,30,0.1)] transition
-        ${dragging ? 'border-[rgba(184,92,56,0.34)] bg-[rgba(240,223,211,0.9)]' : 'border-[rgba(102,72,37,0.12)] bg-[rgba(255,252,247,0.86)] hover:-translate-y-1 hover:border-[rgba(184,92,56,0.22)] hover:bg-white/90'}
-        ${disabled ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'}`}
+      className={`relative overflow-hidden rounded-[1.9rem] border px-6 py-12 text-center shadow-xl transition-all duration-300
+        ${dragging ? 'border-indigo-400 bg-indigo-50/90 shadow-indigo-500/10' : 'border-[var(--line)] bg-white/80 shadow-slate-200/50 backdrop-blur-md hover:-translate-y-1 hover:border-indigo-500/30 hover:bg-white/95 hover:shadow-2xl hover:shadow-indigo-500/10'}
+        ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
     >
-      <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent opacity-80" />
-      <div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-[1.4rem] border border-white/60 shadow-lg ${dragging ? 'bg-[linear-gradient(135deg,var(--accent),var(--accent-deep))] text-white' : 'bg-white/90 text-[var(--accent)]'}`}>
+      <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[var(--line)] to-transparent opacity-80" />
+      <div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-[1.4rem] border border-white/60 shadow-lg transition-colors duration-300 ${dragging ? 'bg-gradient-to-br from-[var(--accent)] to-[var(--accent-deep)] text-white shadow-indigo-500/30' : 'bg-white text-[var(--accent)] shadow-slate-200/50'}`}>
         <svg
           viewBox="0 0 24 24"
           fill="none"
@@ -43,10 +43,10 @@ export default function FileDropZone({ onFiles, disabled }: Props) {
           <line x1="12" y1="2" x2="12" y2="15" />
         </svg>
       </div>
-      <p className="mt-5 text-xl font-semibold tracking-[-0.03em] text-[var(--text)]">
+      <p className="mt-5 text-xl font-bold tracking-tight text-[var(--text)]">
         {dragging ? 'Drop files here' : 'Drag and drop files or click to browse'}
       </p>
-      <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-[var(--muted)]">
+      <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-[var(--muted)]">
         Smooth handoff for documents, media, archives, and anything else you need to move quickly.
       </p>
       <p className="mt-4 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
