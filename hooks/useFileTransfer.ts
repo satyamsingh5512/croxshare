@@ -163,6 +163,11 @@ export function useFileTransfer({ sendSignal, onConnected, onDisconnected }: Use
           isHostRef.current = false;
           setupPeerConnection(pc);
 
+          // Handle glare (simultaneous offers) by rolling back our local offer first.
+          if (pc.signalingState !== 'stable') {
+            await pc.setLocalDescription({ type: 'rollback' });
+          }
+
           await pc.setRemoteDescription(new RTCSessionDescription(msg.data as RTCSessionDescriptionInit));
           await flushPendingIceCandidates(pc);
           const answer = await pc.createAnswer();
