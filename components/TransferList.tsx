@@ -13,21 +13,21 @@ export default function TransferList() {
     <div className="space-y-3">
       <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">Transfers</p>
       {items.map((item) => (
-        <div key={item.id} className="rounded-[1.4rem] border border-[rgba(102,72,37,0.1)] bg-[rgba(255,252,247,0.86)] p-4 shadow-[0_18px_46px_rgba(92,58,30,0.08)]">
+        <div key={item.id} className="rounded-[1.4rem] border border-[var(--line)] bg-white/80 p-4 shadow-lg shadow-slate-200/50 backdrop-blur-sm">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-[var(--text)]">{item.name}</p>
-              <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
+              <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted)] whitespace-nowrap">
                 {item.direction === 'sending' ? 'Sending' : 'Receiving'} · {formatBytes(item.size)}
               </p>
             </div>
-            <span className="shrink-0 rounded-full border border-[rgba(102,72,37,0.12)] bg-white/75 px-2.5 py-1 text-xs font-semibold text-[var(--accent-deep)]">
+            <span className="shrink-0 rounded-full border border-indigo-500/20 bg-indigo-50/80 px-2.5 py-1 text-xs font-semibold text-[var(--accent-deep)] shadow-sm">
               {item.progress}%
             </span>
           </div>
-          <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-[rgba(102,72,37,0.08)]">
+          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100 shadow-inner">
             <div
-              className="h-full rounded-full bg-[linear-gradient(90deg,var(--accent),var(--teal))] transition-all duration-200"
+              className="h-full rounded-full bg-gradient-to-r from-[var(--accent)] to-[var(--teal)] transition-all duration-300"
               style={{ width: `${item.progress}%` }}
             />
           </div>
