@@ -27,7 +27,7 @@ export default function FileReceiver({ files }: Props) {
         return (
           <div
             key={f.meta.id}
-            className="rounded-[1.4rem] border border-[rgba(102,72,37,0.1)] bg-[rgba(255,252,247,0.86)] p-4 shadow-[0_18px_46px_rgba(92,58,30,0.08)]"
+            className="rounded-[1.4rem] border border-[var(--line)] bg-white/80 p-4 shadow-lg shadow-slate-200/50 backdrop-blur-sm"
           >
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
@@ -37,13 +37,13 @@ export default function FileReceiver({ files }: Props) {
               {f.done && f.blob && (
                 <button
                   onClick={() => downloadBlob(f.blob, f.meta.name)}
-                  className="shrink-0 rounded-full bg-[linear-gradient(135deg,var(--accent),var(--accent-deep))] px-4 py-2 text-xs font-semibold text-white shadow-[0_14px_26px_rgba(143,62,34,0.26)] hover:-translate-y-0.5"
+                  className="shrink-0 rounded-full bg-gradient-to-br from-[var(--accent)] to-[var(--accent-deep)] px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-indigo-500/20 transition hover:-translate-y-0.5 hover:shadow-xl hover:shadow-indigo-500/30"
                 >
                   Save
                 </button>
               )}
             </div>
-            {!f.done && <TransferProgress label="Receiving" percent={pct} />}
+            {!f.done && <div className="mt-3"><TransferProgress label="Receiving" percent={pct} /></div>}
           </div>
         );
       })}
