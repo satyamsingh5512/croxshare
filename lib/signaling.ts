@@ -15,6 +15,7 @@ interface JoinOptions {
 
 export class SignalingClient {
   private channel: PresenceChannel | null = null;
+  private knownPeers = new Set<string>();
 
   join(options: JoinOptions) {
     let pusher;
@@ -37,6 +38,7 @@ export class SignalingClient {
     const channelName = `presence-room-${options.roomId}`;
     const channel = pusher.subscribe(channelName) as PresenceChannel;
     this.channel = channel;
+    this.knownPeers.clear();
 
     pusher.connection.bind('error', (error: any) => {
       const message = error?.error?.data?.message || error?.error?.message || 'Signaling connection failed';
@@ -49,18 +51,27 @@ export class SignalingClient {
       members.each((member: any) => {
         if (member.id !== options.myId) others.push(member);
       });
-      if (others.length === 1) {
-        const peer = others[0];
-        options.onPeerJoined(peer.id, peer.info?.name || 'Unknown device');
+      // Presence sync can include stale entries or multiple peers; pick one deterministically.
+      if (others.length > 0) {
+        const peer = others.sort((a, b) => String(a.id).localeCompare(String(b.id)))[0];
+        if (!this.knownPeers.has(peer.id)) {
+          this.knownPeers.add(peer.id);
+          options.onPeerJoined(peer.id, peer.info?.name || 'Unknown device');
+        }
       }
     });
 
     channel.bind('pusher:member_added', (member: any) => {
       if (member.id === options.myId) return;
+      if (this.knownPeers.has(member.id)) return;
+      this.knownPeers.add(member.id);
       options.onPeerJoined(member.id, member.info?.name || 'Unknown device');
     });
 
-    channel.bind('pusher:member_removed', () => {
+    channel.bind('pusher:member_removed', (member: any) => {
+      if (member?.id) {
+        this.knownPeers.delete(member.id);
+      }
       options.onPeerLeft();
     });
 
@@ -97,5 +108,6 @@ export class SignalingClient {
       getPusherClient().unsubscribe(this.channel.name);
     }
     this.channel = null;
+    this.knownPeers.clear();
   }
 }
