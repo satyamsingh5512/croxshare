@@ -52,11 +52,15 @@ export class SignalingClient {
         if (member.id !== options.myId) others.push(member);
       });
       // Presence sync can include stale entries or multiple peers; pick one deterministically.
+      // Use setTimeout to ensure onReady's side-effect (setting mySocketIdRef) propagates
+      // through React state before the host-election logic in onPeerJoined runs.
       if (others.length > 0) {
         const peer = others.sort((a, b) => String(a.id).localeCompare(String(b.id)))[0];
         if (!this.knownPeers.has(peer.id)) {
           this.knownPeers.add(peer.id);
-          options.onPeerJoined(peer.id, peer.info?.name || 'Unknown device');
+          setTimeout(() => {
+            options.onPeerJoined(peer.id, peer.info?.name || 'Unknown device');
+          }, 0);
         }
       }
     });
