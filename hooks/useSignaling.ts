@@ -33,6 +33,31 @@ export function useSignaling({
 }: UseSignalingOptions) {
   const signalingRef = useRef<SignalingClient | null>(null);
   const myIdRef = useRef<string>('');
+  const onPeerJoinedRef = useRef(onPeerJoined);
+  const onPeerLeftRef = useRef(onPeerLeft);
+  const onSignalRef = useRef(onSignal);
+  const onSocketIdRef = useRef(onSocketId);
+  const onErrorRef = useRef(onError);
+
+  useEffect(() => {
+    onPeerJoinedRef.current = onPeerJoined;
+  }, [onPeerJoined]);
+
+  useEffect(() => {
+    onPeerLeftRef.current = onPeerLeft;
+  }, [onPeerLeft]);
+
+  useEffect(() => {
+    onSignalRef.current = onSignal;
+  }, [onSignal]);
+
+  useEffect(() => {
+    onSocketIdRef.current = onSocketId;
+  }, [onSocketId]);
+
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
 
   if (!myIdRef.current) {
     const random = typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -48,11 +73,11 @@ export function useSignaling({
         await signalingRef.current.sendSignal(roomId, myIdRef.current, type, data);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to send signaling message';
-        onError?.(message);
+        onErrorRef.current?.(message);
         throw err;
       }
     },
-    [roomId, onError],
+    [roomId],
   );
 
   useEffect(() => {
@@ -64,18 +89,18 @@ export function useSignaling({
       roomId,
       myId: myIdRef.current,
       myName,
-      onReady: (id) => onSocketId(id),
-      onPeerJoined,
-      onPeerLeft,
-      onSignal,
-      onError,
+      onReady: (id) => onSocketIdRef.current(id),
+      onPeerJoined: (peerId, peerName) => onPeerJoinedRef.current(peerId, peerName),
+      onPeerLeft: () => onPeerLeftRef.current(),
+      onSignal: (msg) => onSignalRef.current(msg),
+      onError: (message) => onErrorRef.current?.(message),
     });
 
     return () => {
       signalingRef.current?.leave();
       signalingRef.current = null;
     };
-  }, [roomId, myName, onPeerJoined, onPeerLeft, onSignal, onSocketId, onError]);
+  }, [roomId, myName]);
 
   return { sendSignal };
 }
