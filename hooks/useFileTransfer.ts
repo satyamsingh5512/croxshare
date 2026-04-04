@@ -255,6 +255,7 @@ export function useFileTransfer({ sendSignal, onConnected, onDisconnected }: Use
     dcRef.current = null;
     pendingIceCandidatesRef.current = [];
     hostStartedRef.current = false;
+    isHostRef.current = false;
   }
 
   return {
