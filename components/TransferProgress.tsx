@@ -12,13 +12,13 @@ export default function TransferProgress({ label, percent }: Props) {
 
   return (
     <div className="space-y-2">
-      <div className="flex justify-between text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+      <div className="flex justify-between text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
         <span>{label}</span>
-        <span>{percent}%</span>
+        <span className="text-[var(--accent-deep)]">{percent}%</span>
       </div>
-      <div className="h-2.5 w-full overflow-hidden rounded-full bg-[rgba(102,72,37,0.08)]">
+      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 shadow-inner">
         <div
-          className="h-full rounded-full bg-[linear-gradient(90deg,var(--accent),var(--teal))] transition-all duration-200"
+          className="h-full rounded-full bg-gradient-to-r from-[var(--accent)] to-[var(--teal)] transition-all duration-300"
           style={{ width: `${percent}%` }}
         />
       </div>
