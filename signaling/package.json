@@ -4,8 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "ts-node --esm server.ts",
-    "start": "ts-node --esm server.ts"
+    "dev": "tsx server.ts",
+    "start": "tsx server.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run typecheck"
   },
   "dependencies": {
     "ws": "^8.18.0"
@@ -13,6 +15,7 @@
   "devDependencies": {
     "@types/ws": "^8.5.12",
     "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }
 }
