@@ -1,4 +1,4 @@
-export const CHUNK_SIZE = 32 * 1024; // 32 KB per chunk
+export const CHUNK_SIZE = 16 * 1024; // 16 KB per chunk (safer default for WebRTC DataChannels)
 
 /**
  * Split a File into fixed-size ArrayBuffer chunks, yielding them one by one.

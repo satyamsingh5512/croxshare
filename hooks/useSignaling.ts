@@ -22,6 +22,21 @@ interface UseSignalingOptions {
   onError?: (message: string) => void;
 }
 
+function isDebugEnabled(): boolean {
+  if (process.env.NEXT_PUBLIC_WEBRTC_DEBUG === '1') return true;
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem('crox:webrtc-debug') === '1';
+  } catch {
+    return false;
+  }
+}
+
+function debugLog(...args: unknown[]) {
+  if (!isDebugEnabled()) return;
+  console.debug('[signaling]', ...args);
+}
+
 export function useSignaling({
   roomId,
   myName,
@@ -70,6 +85,7 @@ export function useSignaling({
     async (type: SignalMessage['type'], data: SignalMessage['data']) => {
       if (!roomId || !myIdRef.current || !signalingRef.current) return;
       try {
+        debugLog('send', { type, roomId, from: myIdRef.current });
         await signalingRef.current.sendSignal(roomId, myIdRef.current, type, data);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to send signaling message';
@@ -90,9 +106,18 @@ export function useSignaling({
       myId: myIdRef.current,
       myName,
       onReady: (id) => onSocketIdRef.current(id),
-      onPeerJoined: (peerId, peerName) => onPeerJoinedRef.current(peerId, peerName),
-      onPeerLeft: () => onPeerLeftRef.current(),
-      onSignal: (msg) => onSignalRef.current(msg),
+      onPeerJoined: (peerId, peerName) => {
+        debugLog('peer joined', { roomId, peerId, peerName });
+        onPeerJoinedRef.current(peerId, peerName);
+      },
+      onPeerLeft: () => {
+        debugLog('peer left', { roomId });
+        onPeerLeftRef.current();
+      },
+      onSignal: (msg) => {
+        debugLog('receive', { type: msg.type, roomId, from: msg.from });
+        onSignalRef.current(msg);
+      },
       onError: (message) => onErrorRef.current?.(message),
     });
 

@@ -23,6 +23,60 @@ interface UseFileTransferOptions {
   onDisconnected: () => void;
 }
 
+const BUFFER_HIGH_WATERMARK = 512 * 1024;
+const BUFFER_LOW_WATERMARK = 64 * 1024;
+
+function isDebugEnabled(): boolean {
+  if (process.env.NEXT_PUBLIC_WEBRTC_DEBUG === '1') return true;
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem('crox:webrtc-debug') === '1';
+  } catch {
+    return false;
+  }
+}
+
+function debugLog(...args: unknown[]) {
+  if (!isDebugEnabled()) return;
+  // Keep logs grouped for easier filtering in browser console.
+  console.debug('[webrtc]', ...args);
+}
+
+async function waitForBufferDrain(dc: RTCDataChannel): Promise<void> {
+  if (dc.bufferedAmount <= BUFFER_HIGH_WATERMARK) return;
+
+  await new Promise<void>((resolve) => {
+    let done = false;
+
+    const finish = () => {
+      if (done) return;
+      done = true;
+      dc.removeEventListener('bufferedamountlow', onBufferedAmountLow);
+      resolve();
+    };
+
+    const onBufferedAmountLow = () => {
+      if (dc.bufferedAmount <= BUFFER_LOW_WATERMARK || dc.readyState !== 'open') {
+        finish();
+      }
+    };
+
+    dc.addEventListener('bufferedamountlow', onBufferedAmountLow);
+
+    // Fallback polling in case a browser misses the event.
+    const poll = () => {
+      if (done) return;
+      if (dc.bufferedAmount <= BUFFER_LOW_WATERMARK || dc.readyState !== 'open') {
+        finish();
+        return;
+      }
+      window.setTimeout(poll, 12);
+    };
+
+    poll();
+  });
+}
+
 export function useFileTransfer({ sendSignal, onConnected, onDisconnected }: UseFileTransferOptions) {
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
@@ -41,12 +95,22 @@ export function useFileTransfer({ sendSignal, onConnected, onDisconnected }: Use
 
   function setupDataChannel(dc: RTCDataChannel) {
     dc.binaryType = 'arraybuffer';
+    dc.bufferedAmountLowThreshold = BUFFER_LOW_WATERMARK;
     dcRef.current = dc;
 
     let current: IncomingFile | null = null;
 
-    dc.onopen = () => onConnected();
-    dc.onclose = () => onDisconnected();
+    dc.onopen = () => {
+      debugLog('datachannel open', { label: dc.label, protocol: dc.protocol });
+      onConnected();
+    };
+    dc.onclose = () => {
+      debugLog('datachannel close', { label: dc.label });
+      onDisconnected();
+    };
+    dc.onerror = () => {
+      debugLog('datachannel error', { label: dc.label, readyState: dc.readyState });
+    };
 
     dc.onmessage = (ev) => {
       if (typeof ev.data === 'string') {
@@ -55,6 +119,12 @@ export function useFileTransfer({ sendSignal, onConnected, onDisconnected }: Use
           | { type: 'file-end' };
 
         if (msg.type === 'file-meta') {
+          debugLog('incoming file metadata', {
+            id: msg.meta.id,
+            name: msg.meta.name,
+            size: msg.meta.size,
+            chunks: msg.meta.chunks,
+          });
           current = {
             meta: msg.meta,
             receivedChunks: 0,
@@ -71,6 +141,7 @@ export function useFileTransfer({ sendSignal, onConnected, onDisconnected }: Use
             status: 'active',
           });
         } else if (msg.type === 'file-end' && current) {
+          debugLog('incoming file complete', { id: current.meta.id, name: current.meta.name });
           const blob = reassemble(current.buffers, current.meta.mime);
           current.blob = blob;
           current.done = true;
@@ -106,15 +177,29 @@ export function useFileTransfer({ sendSignal, onConnected, onDisconnected }: Use
   function setupPeerConnection(pc: RTCPeerConnection) {
     pc.onicecandidate = async (ev) => {
       if (ev.candidate) {
+        debugLog('local ICE candidate generated', {
+          candidateType: ev.candidate.type,
+          protocol: ev.candidate.protocol,
+        });
         await sendSignal('ice', ev.candidate.toJSON());
       }
     };
 
     pc.ondatachannel = (ev) => {
+      debugLog('remote datachannel received', { label: ev.channel.label });
       setupDataChannel(ev.channel);
     };
 
+    pc.oniceconnectionstatechange = () => {
+      debugLog('iceConnectionState', pc.iceConnectionState);
+    };
+
+    pc.onicegatheringstatechange = () => {
+      debugLog('iceGatheringState', pc.iceGatheringState);
+    };
+
     pc.onconnectionstatechange = () => {
+      debugLog('peer connectionState', pc.connectionState);
       if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
         onDisconnected();
       }
@@ -148,6 +233,7 @@ export function useFileTransfer({ sendSignal, onConnected, onDisconnected }: Use
 
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
+    debugLog('sending SDP offer');
     await sendSignal('offer', offer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sendSignal]);
@@ -158,6 +244,7 @@ export function useFileTransfer({ sendSignal, onConnected, onDisconnected }: Use
     async (msg: SignalMessage) => {
       try {
         if (msg.type === 'offer') {
+          debugLog('received SDP offer');
           const pc = pcRef.current ?? await createPeerConnection();
           pcRef.current = pc;
           isHostRef.current = false;
@@ -172,8 +259,10 @@ export function useFileTransfer({ sendSignal, onConnected, onDisconnected }: Use
           await flushPendingIceCandidates(pc);
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
+          debugLog('sending SDP answer');
           await sendSignal('answer', answer);
         } else if (msg.type === 'answer') {
+          debugLog('received SDP answer');
           if (!pcRef.current) return;
 
           await pcRef.current.setRemoteDescription(
@@ -181,6 +270,7 @@ export function useFileTransfer({ sendSignal, onConnected, onDisconnected }: Use
           );
           await flushPendingIceCandidates(pcRef.current);
         } else if (msg.type === 'ice') {
+          debugLog('received remote ICE candidate');
           const candidate = msg.data as RTCIceCandidateInit;
           const pc = pcRef.current;
 
@@ -216,6 +306,7 @@ export function useFileTransfer({ sendSignal, onConnected, onDisconnected }: Use
       chunks,
     };
 
+    debugLog('start sending file', { id, name: file.name, size: file.size, chunks });
     dc.send(JSON.stringify({ type: 'file-meta', meta }));
     setSendProgress(0);
     setStoreSendProgress(0);
@@ -230,10 +321,9 @@ export function useFileTransfer({ sendSignal, onConnected, onDisconnected }: Use
 
     let sent = 0;
     for await (const { data, index } of chunkFile(file)) {
-      // Back-pressure: wait if buffer is filling up
-      while (dc.bufferedAmount > 512 * 1024) {
-        await new Promise((r) => setTimeout(r, 10));
-      }
+      // Event-driven backpressure using bufferedAmountLowThreshold + bufferedamountlow.
+      await waitForBufferDrain(dc);
+      if (dc.readyState !== 'open') return;
       dc.send(data);
       sent = index + 1;
       const progress = Math.min(99, Math.round((sent / chunks) * 100));
@@ -243,6 +333,7 @@ export function useFileTransfer({ sendSignal, onConnected, onDisconnected }: Use
     }
 
     dc.send(JSON.stringify({ type: 'file-end' }));
+    debugLog('file send complete', { id, name: file.name });
     setSendProgress(100);
     setStoreSendProgress(100);
     markTransferDone(id);

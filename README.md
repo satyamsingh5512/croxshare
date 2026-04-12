@@ -163,3 +163,32 @@ Use that LAN IP in:
 - Signaling server supports more than 2 peers in a room.
 - Current UI pairs first available peer for direct transfer.
 - No database and no persistent message storage.
+
+## 8. WebRTC Debug Checklist
+
+### Phase 1: Signaling (handshake)
+
+- Open DevTools -> Network -> `WS` and confirm the signaling socket/channel stays connected.
+- Enable app debug logs:
+  - `localStorage.setItem('crox:webrtc-debug', '1')` then refresh, or
+  - set `NEXT_PUBLIC_WEBRTC_DEBUG=1` in `.env` and restart dev server.
+- In Console, verify logs for:
+  - peer join/leave
+  - SDP offer/answer send + receive
+  - ICE candidate send + receive
+
+### Phase 2: ICE + NAT traversal
+
+- Open `chrome://webrtc-internals` (or Firefox `about:webrtc`).
+- Confirm ICE state progresses (`new` -> `checking` -> `connected`/`completed`).
+- If state stays `checking` or hits `failed`, add TURN (`TURN_URLS`, `TURN_USERNAME`, `TURN_CREDENTIAL`) in `.env`.
+- Confirm `onicecandidate` fires and candidate exchange logs appear on both peers.
+
+### Phase 3: DataChannel + file transfer
+
+- Confirm DataChannel `onopen` is logged before transfer starts.
+- Files are chunked at `16KB` (`CHUNK_SIZE = 16 * 1024`).
+- Backpressure is implemented via:
+  - `bufferedAmountLowThreshold = 64KB`
+  - pause when `bufferedAmount > 512KB`
+  - resume on `bufferedamountlow` event (with polling fallback)
