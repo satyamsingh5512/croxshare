@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Decentralized chat web app with P2P file sharing",
   "scripts": {
-    "dev": "next dev --hostname 0.0.0.0",
+    "dev": "next dev --experimental-https --hostname 0.0.0.0",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",

@@ -2,6 +2,7 @@ export class PeerConnectionManager {
     options;
     pc;
     dc = null;
+    pendingCandidates = [];
     constructor(options) {
         this.options = options;
         const iceServers = options.lanOnly ? [] : [{ urls: 'stun:stun.l.google.com:19302' }];
@@ -41,6 +42,7 @@ export class PeerConnectionManager {
     async handleOffer(payload, fromPeerId) {
         try {
             await this.pc.setRemoteDescription(new RTCSessionDescription(payload));
+            await this.flushIceCandidates();
             const answer = await this.pc.createAnswer();
             await this.pc.setLocalDescription(answer);
             this.options.emit({
@@ -58,6 +60,7 @@ export class PeerConnectionManager {
     async handleAnswer(payload) {
         try {
             await this.pc.setRemoteDescription(new RTCSessionDescription(payload));
+            await this.flushIceCandidates();
         }
         catch (error) {
             this.options.onError?.(error instanceof Error ? error.message : 'Failed to handle answer.');
@@ -65,10 +68,27 @@ export class PeerConnectionManager {
     }
     async handleIceCandidate(payload) {
         try {
+            if (!this.pc.remoteDescription) {
+                this.pendingCandidates.push(payload);
+                return;
+            }
             await this.pc.addIceCandidate(new RTCIceCandidate(payload));
         }
         catch (error) {
             this.options.onError?.(error instanceof Error ? error.message : 'Failed to add ICE candidate.');
+        }
+    }
+    async flushIceCandidates() {
+        while (this.pendingCandidates.length > 0) {
+            const candidate = this.pendingCandidates.shift();
+            if (candidate) {
+                try {
+                    await this.pc.addIceCandidate(new RTCIceCandidate(candidate));
+                }
+                catch (error) {
+                    this.options.onError?.(error instanceof Error ? error.message : 'Failed to flush ICE candidate.');
+                }
+            }
         }
     }
     destroy() {
@@ -84,6 +104,7 @@ export class PeerConnectionManager {
         this.pc.onconnectionstatechange = null;
         this.pc.ondatachannel = null;
         this.pc.close();
+        this.pendingCandidates = [];
     }
     bindPeerEvents() {
         this.pc.onicecandidate = (event) => {
