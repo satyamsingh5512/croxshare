@@ -8,8 +8,8 @@ flowchart LR
 
   subgraph NextJS[Next.js App]
     UI[UI + Room UX]
-    SignalAPI[/api/signal]
-    StunAPI[/api/stun]
+    SignalAPI[/api/signal/]
+    StunAPI[/api/stun/]
   end
 
   subgraph Signaling[Signaling Layer]
