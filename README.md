@@ -1,194 +1,79 @@
-# Croxshare
+# CroxShare
 
-Croxshare is a LAN-first, peer-to-peer file transfer app using WebRTC DataChannels.
-After peers connect, file data goes directly device-to-device (no cloud relay).
+## System design diagram
 
-## Project Layout
+```mermaid
+flowchart LR
+  A[Sender Browser] <-- WebRTC DataChannel --> B[Receiver Browser]
 
-- `./` (root): Next.js 15 app router UI + API routes (`/api/signal`, `/api/stun`)
-- `signaling/`: standalone Node.js + `ws` signaling server (offer/answer/ICE relay)
-- `client/`: legacy/alternate React 18 + Vite frontend
+  subgraph NextJS[Next.js App]
+    UI[UI + Room UX]
+    SignalAPI[/api/signal]
+    StunAPI[/api/stun]
+  end
 
-## Features
+  subgraph Signaling[Signaling Layer]
+    Pusher[(Pusher Presence Channel)]
+    WS[(Optional ws Signaling Server)]
+  end
 
-- Room-based WebSocket signaling
-- WebRTC DataChannel (`ordered: true`) transfer
-- Lazy chunked upload with `File.slice()` + `FileReader`
-- Backpressure handling with `bufferedAmount` threshold
-- Progress, transfer speed, ETA, and per-file status
-- Auto-download on receiver side
-- QR code join flow for LAN devices
-- Auto-reconnect signaling client with exponential backoff
+  subgraph Ice[ICE Services]
+    STUN[Public STUN]
+    TURN[(Optional TURN)]
+  end
 
-## Requirements
+  A --> UI
+  B --> UI
+  UI --> SignalAPI
+  SignalAPI --> Pusher
+  A -. optional .-> WS
+  B -. optional .-> WS
 
-- Node.js 18+
-- Two devices on the same local network for LAN transfer
+  A --> StunAPI
+  B --> StunAPI
+  StunAPI --> STUN
+  StunAPI --> TURN
+```
 
-## 1. Setup Environment
+## Overview
 
-Create the root `.env` file with your signaling provider settings:
+CroxShare is a LAN-first peer-to-peer file sharing app. It uses WebRTC DataChannels for direct browser-to-browser transfers and uses WebSockets for signaling. Files move device-to-device with no file relay server.
 
-- `PUSHER_APP_ID=...`
-- `PUSHER_SECRET=...`
-- `NEXT_PUBLIC_PUSHER_KEY=...`
-- `NEXT_PUBLIC_PUSHER_CLUSTER=...`
-- `NEXT_PUBLIC_APP_URL=http://<LAN_IP>:3000`
+## What it does
 
-Optional TURN settings for harder NAT cases:
+- Short room codes for quick pairing
+- Direct WebRTC DataChannel transfer (ordered, binary)
+- Progress, speed, and ETA with auto-download on completion
+- TURN fallback via `/api/stun` for harder NAT cases
 
-- `TURN_URLS=turn:host:3478,turns:host:5349`
-- `TURN_USERNAME=...`
-- `TURN_CREDENTIAL=...`
+## How it works
 
-### Signaling env (optional)
+1. Sender creates a room and shares the code.
+2. Peers exchange SDP + ICE over WebSockets (Pusher or optional `ws`).
+3. A WebRTC peer connection opens a DataChannel.
+4. Files are chunked and sent with backpressure handling.
+5. Receiver reassembles chunks and downloads.
 
-You can export in shell or create `signaling/.env` with:
+## Tech stack
 
-- `PORT=8080`
-- `USE_WSS=false`
-- `ALLOWED_ORIGINS=http://<LAN_IP>:5173,http://localhost:5173`
+- WebRTC DataChannels, WebSockets (Pusher presence by default)
+- Next.js 15 + React 19 + TypeScript + Tailwind CSS
 
-### Legacy Vite client env (optional)
-
-Create `client/.env` with:
-
-- `VITE_SIGNALING_URL=ws://<LAN_IP>:8080`
-- `VITE_LAN_ONLY_ICE=false`
-
-If `VITE_SIGNALING_URL` is omitted, the client defaults to `ws://<current-hostname>:8080`.
-
-## 2. Install and Run
-
-### Main app (recommended)
-
-Open one terminal at repo root:
+## Quick start
 
 ```bash
 npm install
 npm run dev
 ```
 
-Then open:
+Open `http://localhost:3000` or `http://<LAN_IP>:3000`.
 
-- `http://localhost:3000`, or
-- `http://<LAN_IP>:3000`
+## Environment
 
-### Standalone signaling server (optional)
+- `PUSHER_APP_ID`, `PUSHER_SECRET`, `NEXT_PUBLIC_PUSHER_KEY`, `NEXT_PUBLIC_PUSHER_CLUSTER`
+- `TURN_URLS`, `TURN_USERNAME`, `TURN_CREDENTIAL` (optional)
 
-Open another terminal if you want the standalone `ws` server:
+## Resume-aligned highlights
 
-```bash
-cd signaling
-npm install
-npm run dev
-```
-
-### Legacy Vite client (optional)
-
-```bash
-cd client
-npm install
-npm run dev
-```
-
-Then open `http://localhost:5173` (or `http://<LAN_IP>:5173`).
-
-## 3. Health Checks
-
-### Root app
-
-```bash
-npm run typecheck
-npm run build
-npm run test
-```
-
-### Signaling
-
-```bash
-cd signaling
-npm run typecheck
-npm run test
-```
-
-## 4. How to Find Your LAN IP
-
-### Linux
-
-```bash
-ip addr
-```
-
-Look for an address like `192.168.x.x` or `10.x.x.x` on your active interface.
-
-### macOS
-
-```bash
-ifconfig
-```
-
-### Windows
-
-```powershell
-ipconfig
-```
-
-Use that LAN IP in:
-
-- browser URL (main app): `http://<LAN_IP>:3000`
-- browser URL (legacy client): `http://<LAN_IP>:5173`
-- `VITE_SIGNALING_URL=ws://<LAN_IP>:8080` (legacy client only)
-
-## 5. Mobile Device Flow
-
-1. Start the root Next.js app.
-2. On laptop, open `http://<LAN_IP>:3000`.
-3. On phone (same WiFi), open the same URL.
-4. Create room on one device.
-5. Share room code or scan QR from the other device.
-6. Transfer files directly.
-
-## 6. Expected Test Path
-
-1. Two tabs join same room.
-2. Connection badge becomes `Connected`.
-3. Queue one small file and click `Send All`.
-4. Observe progress, speed, ETA updates.
-5. Receiver auto-downloads on completion.
-6. Try large file (>100MB) to validate chunking and backpressure.
-
-## 7. Notes
-
-- Signaling server supports more than 2 peers in a room.
-- Current UI pairs first available peer for direct transfer.
-- No database and no persistent message storage.
-
-## 8. WebRTC Debug Checklist
-
-### Phase 1: Signaling (handshake)
-
-- Open DevTools -> Network -> `WS` and confirm the signaling socket/channel stays connected.
-- Enable app debug logs:
-  - `localStorage.setItem('crox:webrtc-debug', '1')` then refresh, or
-  - set `NEXT_PUBLIC_WEBRTC_DEBUG=1` in `.env` and restart dev server.
-- In Console, verify logs for:
-  - peer join/leave
-  - SDP offer/answer send + receive
-  - ICE candidate send + receive
-
-### Phase 2: ICE + NAT traversal
-
-- Open `chrome://webrtc-internals` (or Firefox `about:webrtc`).
-- Confirm ICE state progresses (`new` -> `checking` -> `connected`/`completed`).
-- If state stays `checking` or hits `failed`, add TURN (`TURN_URLS`, `TURN_USERNAME`, `TURN_CREDENTIAL`) in `.env`.
-- Confirm `onicecandidate` fires and candidate exchange logs appear on both peers.
-
-### Phase 3: DataChannel + file transfer
-
-- Confirm DataChannel `onopen` is logged before transfer starts.
-- Files are chunked at `16KB` (`CHUNK_SIZE = 16 * 1024`).
-- Backpressure is implemented via:
-  - `bufferedAmountLowThreshold = 64KB`
-  - pause when `bufferedAmount > 512KB`
-  - resume on `bufferedamountlow` event (with polling fallback)
+- WebRTC-based P2P file sharing with Node.js signaling and WebSockets.
+- Chunked file transport with backpressure for smooth large transfers.
