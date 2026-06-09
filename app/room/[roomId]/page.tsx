@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import QRCode from 'qrcode';
@@ -10,7 +10,8 @@ import FileDropZone from '@/components/FileDropZone';
 import FileReceiver from '@/components/FileReceiver';
 import TransferList from '@/components/TransferList';
 import RoomHeader from '@/components/RoomHeader';
-import type { PeerStatus, SignalMessage } from '@/types';
+import ConnectedDevices from '@/components/ConnectedDevices';
+import type { DiscoveredPeer, SignalMessage } from '@/types';
 import { normalizeRoomCode } from '@/lib/utils';
 
 export default function RoomPage() {
@@ -19,25 +20,18 @@ export default function RoomPage() {
 
   const [myName, setMyName] = useState('');
   const [nameSet, setNameSet] = useState(false);
-  const [status, setStatus] = useState<PeerStatus>('waiting');
-  const [peerName, setPeerName] = useState<string | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [configError, setConfigError] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const mySocketIdRef = React.useRef<string | null>(null);
+  const [peers, setPeers] = useState<DiscoveredPeer[]>([]);
+  const myIdRef = useRef<string>('');
+
+  // Derived: overall status from peers list
+  const hasConnected = peers.some((p) => p.status === 'connected');
+  const status = hasConnected ? 'connected' : peers.length > 0 ? 'connecting' : 'waiting';
 
   const configuredOrigin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '');
   const shareOrigin = configuredOrigin || (typeof window !== 'undefined' ? window.location.origin : '');
   const shareUrl = shareOrigin ? `${shareOrigin}/room/${roomId}` : '';
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const currentPath = window.location.pathname;
-    const canonicalPath = `/room/${roomId}`;
-    if (roomId && currentPath !== canonicalPath) {
-      window.history.replaceState(null, '', canonicalPath);
-    }
-  }, [roomId]);
 
   useEffect(() => {
     if (!process.env.NEXT_PUBLIC_PUSHER_KEY || !process.env.NEXT_PUBLIC_PUSHER_CLUSTER) {
@@ -52,74 +46,69 @@ export default function RoomPage() {
 
   useEffect(() => {
     const saved = localStorage.getItem('crox:name');
-    if (saved) {
-      setMyName(saved);
-      setNameSet(true);
-    }
+    if (saved) { setMyName(saved); setNameSet(true); }
   }, []);
 
-  const onConnected = useCallback(() => {
-    setStatus('connected');
-    setStatusMessage(null);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !roomId) return;
+    const canonical = `/room/${roomId}`;
+    if (window.location.pathname !== canonical) window.history.replaceState(null, '', canonical);
+  }, [roomId]);
+
+  function updatePeerStatus(peerId: string, status: DiscoveredPeer['status']) {
+    setPeers((prev) => prev.map((p) => p.id === peerId ? { ...p, status } : p));
+  }
+
+  const onPeerConnected = useCallback((peerId: string) => {
+    updatePeerStatus(peerId, 'connected');
   }, []);
 
-  const onDisconnected = useCallback(() => {
-    setStatus('disconnected');
-    setStatusMessage(null);
+  const onPeerDisconnected = useCallback((peerId: string) => {
+    updatePeerStatus(peerId, 'disconnected');
   }, []);
 
-  const sendSignalRef = React.useRef<((t: SignalMessage['type'], d: SignalMessage['data']) => Promise<void>) | null>(null);
-
-  const wrappedSendSignal = useCallback(
-    async (t: SignalMessage['type'], d: SignalMessage['data']) => {
-      await sendSignalRef.current?.(t, d);
-    },
+  // sendSignal ref trick so useFileTransfer doesn't need to re-create on every render
+  const sendSignalRef = useRef<((t: SignalMessage['type'], d: SignalMessage['data'], to?: string) => Promise<void>) | null>(null);
+  const wrappedSend = useCallback(
+    (t: SignalMessage['type'], d: SignalMessage['data'], to?: string) => sendSignalRef.current?.(t, d, to) ?? Promise.resolve(),
     [],
   );
 
-  const { startAsHost, handleSignal, sendFile, incomingFiles, cleanup } =
-    useFileTransfer({ sendSignal: wrappedSendSignal, onConnected, onDisconnected });
+  const { connectToPeer, handleSignal, sendFile, incomingFiles, removePeer, cleanup } =
+    useFileTransfer({ sendSignal: wrappedSend, onPeerConnected, onPeerDisconnected });
 
-  const onPeerJoined = useCallback(
-    (peerId: string, name: string) => {
-      setPeerName(name);
-      setStatus('connecting');
-      setStatusMessage(null);
-      const myPeerId = mySocketIdRef.current;
-      if (myPeerId && myPeerId < peerId) {
-        startAsHost();
-      }
-    },
-    [startAsHost],
-  );
+  const onPeerJoined = useCallback((peerId: string, peerName: string) => {
+    setPeers((prev) => {
+      if (prev.some((p) => p.id === peerId)) return prev;
+      return [...prev, { id: peerId, name: peerName, status: 'discovered' }];
+    });
+  }, []);
 
-  const onPeerLeft = useCallback(() => {
-    cleanup();
-    setPeerName(null);
-    setStatus('waiting');
-    setStatusMessage(null);
-  }, [cleanup]);
+  const onPeerLeft = useCallback((peerId: string) => {
+    setPeers((prev) => prev.filter((p) => p.id !== peerId));
+    removePeer(peerId);
+  }, [removePeer]);
 
-  const { sendSignal } = useSignaling({
+  const { sendSignal, myId } = useSignaling({
     roomId: nameSet ? roomId : null,
     myName,
     onPeerJoined,
     onPeerLeft,
     onSignal: handleSignal,
-    onSocketId: (id) => {
-      mySocketIdRef.current = id;
-    },
-    onError: (message) => {
-      setStatus('error');
-      setStatusMessage(message);
-    },
+    onReady: (id) => { myIdRef.current = id; },
+    onError: (msg) => console.error('[signaling error]', msg),
   });
 
-  useEffect(() => {
-    sendSignalRef.current = sendSignal;
-  }, [sendSignal]);
-
+  useEffect(() => { sendSignalRef.current = sendSignal; }, [sendSignal]);
   useEffect(() => () => cleanup(), [cleanup]);
+
+  const handleConnect = useCallback((peerId: string) => {
+    updatePeerStatus(peerId, 'connecting');
+    connectToPeer(peerId).catch(() => updatePeerStatus(peerId, 'discovered'));
+  }, [connectToPeer]);
+
+  // First connected peer (for file sending target)
+  const connectedPeer = peers.find((p) => p.status === 'connected');
 
   if (configError) {
     return (
@@ -145,7 +134,7 @@ export default function RoomPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">Before joining</p>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--text)]">What&apos;s your device called?</h1>
           <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">
-            This label is shown to the other person so they know which device is requesting the transfer.
+            This label is shown to the other person so they know which device is connecting.
           </p>
           <input
             value={myName}
@@ -179,12 +168,21 @@ export default function RoomPage() {
   return (
     <div className="min-h-screen px-4 py-6 sm:px-6">
       <main className="mx-auto max-w-5xl space-y-6 py-4">
-        <RoomHeader roomId={roomId} shareUrl={shareUrl} status={status} peerName={peerName} qrDataUrl={qrDataUrl} />
+        <RoomHeader
+          roomId={roomId}
+          shareUrl={shareUrl}
+          status={status}
+          peerName={connectedPeer?.name ?? null}
+          qrDataUrl={qrDataUrl}
+        />
 
-        {status === 'connected' ? (
+        {/* Peer discovery panel — always visible once in room */}
+        <ConnectedDevices peers={peers} onConnect={handleConnect} />
+
+        {hasConnected ? (
           <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
             <div className="space-y-6">
-              <FileDropZone onFiles={(files) => files.forEach((f) => sendFile(f))} />
+              <FileDropZone onFiles={(files) => files.forEach((f) => sendFile(f, connectedPeer?.id))} />
               <TransferList />
             </div>
             <FileReceiver files={incomingFiles} />
@@ -198,10 +196,9 @@ export default function RoomPage() {
             </div>
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">Room status</p>
             <div className="mt-3 text-base leading-relaxed text-[var(--text)] font-medium">
-              {status === 'waiting' && 'Share the code or link above. File transfer starts once the other device joins.'}
-              {status === 'connecting' && 'Establishing secure connection...'}
-              {status === 'disconnected' && 'The other device disconnected. Ask them to rejoin.'}
-              {status === 'error' && (statusMessage || 'Connection failed. Try refreshing the page.')}
+              {peers.length === 0
+                ? 'Share the code or link above. Devices that join will appear above — click Connect to start.'
+                : 'Click Connect next to a device to establish a WebRTC connection.'}
             </div>
           </div>
         )}
