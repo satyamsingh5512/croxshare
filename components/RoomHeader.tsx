@@ -17,49 +17,50 @@ interface RoomHeaderProps {
 export default function RoomHeader({ roomId, shareUrl, status, peerName, qrDataUrl }: RoomHeaderProps) {
   return (
     <>
-      <header className="rounded-[1.7rem] border border-[var(--line)] bg-white/80 shadow-xl shadow-slate-200/50 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-2xl flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
-          <Link href="/" className="flex items-center gap-3 transition hover:opacity-80">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--accent)] to-[var(--accent-deep)] text-white shadow-lg shadow-indigo-500/20">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
-                <path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2" />
-                <rect x="8" y="8" width="12" height="12" rx="2" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">Croxshare room</p>
-              <span className="text-lg font-semibold tracking-tight text-[var(--text)]">Ready to transfer</span>
-            </div>
-          </Link>
-          <PeerStatusBadge status={status} peerName={peerName} />
-        </div>
+      {/* top bar */}
+      <header className="flex items-center justify-between rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-5 py-4">
+        <Link href="/" className="flex items-center gap-3 opacity-90 transition hover:opacity-100">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-700 shadow-md shadow-violet-900/40">
+            <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" className="h-4 w-4">
+              <path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2" />
+              <rect x="8" y="8" width="12" height="12" rx="2" />
+            </svg>
+          </div>
+          <span className="text-sm font-semibold text-[var(--text-2)]">Croxshare</span>
+        </Link>
+        <PeerStatusBadge status={status} peerName={peerName} />
       </header>
 
-      <div className="grid gap-4 rounded-[1.8rem] border border-[var(--line)] bg-white/80 p-6 shadow-xl shadow-slate-200/50 backdrop-blur-xl md:grid-cols-[1.1fr_0.9fr]">
+      {/* room info */}
+      <div className="grid gap-4 rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-6 md:grid-cols-[1fr_auto]">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">Room code</p>
-          <p className="mt-2 text-4xl font-bold tracking-[0.28em] text-[var(--text)]">{formatRoomCode(roomId)}</p>
-          <p className="mt-4 max-w-md text-sm leading-relaxed text-[var(--muted)]">
-            Share this room link or scan the code from the receiving device to start the handshake.
+          <p className="label-cap">Room code</p>
+          <p className="mt-2 font-mono text-4xl font-bold tracking-[0.3em] text-[var(--text)]">
+            {formatRoomCode(roomId)}
+          </p>
+          <p className="mt-3 max-w-sm text-sm leading-relaxed text-[var(--muted)]">
+            Share this code or link. Other devices in the room appear below — click Connect to start a transfer.
           </p>
 
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="flex flex-1 items-center gap-2 rounded-[1rem] border border-[var(--line)] bg-white/80 px-3 py-3 shadow-inner">
-              <span className="flex-1 truncate text-xs font-medium text-[var(--muted)]">{shareUrl}</span>
-              <button
-                onClick={() => navigator.clipboard.writeText(shareUrl)}
-                className="shrink-0 rounded-full border border-indigo-500/20 bg-[var(--accent-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-deep)] shadow-sm transition hover:-translate-y-0.5 hover:shadow hover:bg-indigo-100"
-              >
-                Copy link
-              </button>
-            </div>
+          <div className="mt-5 flex max-w-sm items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface-3)] px-3 py-2.5">
+            <span className="flex-1 truncate font-mono text-xs text-[var(--muted)]">{shareUrl}</span>
+            <button
+              onClick={() => navigator.clipboard.writeText(shareUrl)}
+              className="shrink-0 rounded-lg border border-[var(--line-bright)] bg-[var(--accent-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--accent)] transition hover:border-[var(--accent)] hover:bg-violet-500/20"
+            >
+              Copy
+            </button>
           </div>
         </div>
 
         {qrDataUrl && (
-          <div className="flex flex-col items-center justify-center rounded-[1.5rem] border border-[var(--line)] bg-slate-50/50 p-5">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">Scan to join</p>
-            <img src={qrDataUrl} alt="QR code" className="h-44 w-44 rounded-[1.2rem] border border-slate-200 bg-white p-2 shadow-lg shadow-slate-300/30" />
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-[var(--line)] bg-[var(--surface-3)] p-4">
+            <p className="label-cap mb-3">Scan to join</p>
+            <img
+              src={qrDataUrl}
+              alt="QR code"
+              className="h-36 w-36 rounded-xl border border-[var(--line)] bg-white p-2"
+            />
           </div>
         )}
       </div>
