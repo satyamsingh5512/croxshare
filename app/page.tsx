@@ -4,97 +4,104 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { generateRoomCode, normalizeRoomCode } from '@/lib/utils';
 
-const steps = [
-  { n: '01', t: 'Create room', d: 'Open a private room in one tap and share the code instantly.' },
-  { n: '02', t: 'Join cleanly', d: 'Use the room code from another device and enter the transfer flow without friction.' },
-  { n: '03', t: 'Transfer direct', d: 'Once connected, the interface stays focused on the file handoff itself.' },
+const features = [
+  { n: '01', t: 'Create a room', d: 'One tap opens a private room with a short code. Nothing persists after you leave.' },
+  { n: '02', t: 'Share the code', d: 'Hand the 6-character code to the other device. No accounts, no friction.' },
+  { n: '03', t: 'Files move direct', d: 'WebRTC DataChannel — browser to browser. No relay server touches your files.' },
 ];
 
 export default function HomePage() {
   const router = useRouter();
   const [joinCode, setJoinCode] = useState('');
 
-  function create() {
-    const code = generateRoomCode();
-    router.push(`/room/${code}`);
-  }
-
+  function create() { router.push(`/room/${generateRoomCode()}`); }
   function join() {
     const code = normalizeRoomCode(joinCode);
-    if (code.length !== 6) return;
-    router.push(`/room/${code}`);
+    if (code.length === 6) router.push(`/room/${code}`);
   }
 
   return (
     <div className="relative min-h-screen overflow-hidden px-4 py-10 sm:px-6 lg:px-8">
-      <div className="absolute left-8 top-12 h-32 w-32 rounded-full bg-[var(--accent)]/10 blur-3xl" />
-      <div className="absolute bottom-16 right-8 h-40 w-40 rounded-full bg-[var(--teal)]/10 blur-3xl" />
+      {/* ambient orbs */}
+      <div className="pointer-events-none absolute -left-32 -top-32 h-96 w-96 rounded-full bg-violet-700/20 blur-[120px]" />
+      <div className="pointer-events-none absolute -bottom-40 -right-20 h-[28rem] w-[28rem] rounded-full bg-purple-900/30 blur-[140px]" />
 
-      <div className="mx-auto grid min-h-[calc(100vh-5rem)] max-w-6xl items-center gap-10 lg:grid-cols-[1.15fr_0.85fr]">
-        <section className="relative rounded-[2rem] border border-[var(--line)] bg-white/70 p-7 shadow-2xl shadow-indigo-500/5 backdrop-blur-xl md:p-10 lg:p-12">
-          <div className="inline-flex items-center gap-3 rounded-full border border-[var(--line)] bg-white/80 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-            <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--accent)] to-[var(--accent-deep)] text-white shadow-lg shadow-indigo-500/20">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
+      <div className="mx-auto grid min-h-[calc(100vh-5rem)] max-w-6xl items-center gap-8 lg:grid-cols-[1.2fr_0.8fr]">
+
+        {/* ── left: hero ── */}
+        <section className="relative">
+          {/* logo wordmark */}
+          <div className="mb-10 inline-flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-700 shadow-lg shadow-violet-900/50">
+              <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" className="h-5 w-5">
                 <path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2" />
                 <rect x="8" y="8" width="12" height="12" rx="2" />
               </svg>
             </div>
-            Croxshare
+            <span className="text-sm font-semibold tracking-wide text-[var(--text-2)]">Croxshare</span>
           </div>
 
-          <h1 className="mt-8 max-w-2xl text-5xl font-semibold leading-[0.96] tracking-[-0.04em] text-[var(--text)] sm:text-6xl lg:text-7xl">
-            File sharing that feels fast before the transfer even starts.
+          <h1 className="max-w-xl text-[3.5rem] font-bold leading-[1.0] tracking-[-0.04em] text-[var(--text)] sm:text-6xl lg:text-7xl">
+            Move files.<br />
+            <span className="bg-gradient-to-r from-violet-400 to-purple-300 bg-clip-text text-transparent">
+              Zero friction.
+            </span>
           </h1>
-          <p className="mt-6 max-w-xl text-base leading-relaxed text-[var(--muted)] sm:text-lg">
-            Create a room, pass a short code, and move files in a calmer, more focused interface built for quick handoffs between devices.
+
+          <p className="mt-6 max-w-md text-base leading-relaxed text-[var(--muted)] sm:text-[1.05rem]">
+            Create a room, pass a short code, and transfer files directly between browsers — no cloud, no login, no size limits.
           </p>
 
-          <div className="mt-8 grid gap-4 sm:grid-cols-3">
-            {steps.map((s) => (
-              <div key={s.n} className="rounded-[1.4rem] border border-[var(--line)] bg-white/80 p-5 shadow-lg shadow-slate-200/50 backdrop-blur-sm transition hover:-translate-y-0.5 hover:shadow-xl hover:shadow-indigo-500/5">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--accent)]">{s.n}</p>
-                <p className="mt-3 text-lg font-semibold tracking-tight text-[var(--text)]">{s.t}</p>
-                <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">{s.d}</p>
+          {/* feature steps */}
+          <div className="mt-10 grid gap-3 sm:grid-cols-3">
+            {features.map((f) => (
+              <div key={f.n} className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-5 transition hover:border-[var(--line-bright)] hover:bg-[var(--surface-3)]">
+                <p className="label-cap text-violet-500">{f.n}</p>
+                <p className="mt-3 text-sm font-semibold text-[var(--text)]">{f.t}</p>
+                <p className="mt-1.5 text-xs leading-relaxed text-[var(--muted)]">{f.d}</p>
               </div>
             ))}
           </div>
 
-          <div className="mt-8 flex flex-wrap gap-3 text-xs uppercase tracking-[0.22em] text-[var(--muted)]">
-            <span className="rounded-full border border-[var(--line)] bg-white/60 px-4 py-2">No login</span>
-            <span className="rounded-full border border-[var(--line)] bg-white/60 px-4 py-2">Room code first</span>
-            <span className="rounded-full border border-[var(--line)] bg-white/60 px-4 py-2">Direct transfer UX</span>
+          {/* pills */}
+          <div className="mt-8 flex flex-wrap gap-2">
+            {['WebRTC P2P', 'No login', 'Any file type', 'LAN-first'].map((t) => (
+              <span key={t} className="rounded-full border border-[var(--line)] bg-[var(--accent-soft)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--accent)]">
+                {t}
+              </span>
+            ))}
           </div>
         </section>
 
-        <section className="space-y-6">
-          <div className="rounded-[2rem] border border-[var(--line)] bg-white/80 p-7 shadow-xl shadow-slate-200/50 backdrop-blur-lg">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">Start a session</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--text)]">Send files</h2>
-            <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">Create a room and hand off the code to the receiving device.</p>
-            <button
-              onClick={create}
-              className="mt-6 w-full rounded-[1.2rem] bg-gradient-to-br from-[var(--accent)] to-[var(--accent-deep)] px-5 py-4 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-indigo-500/30"
-            >
-              Create Room
+        {/* ── right: action cards ── */}
+        <section className="space-y-4">
+          {/* create */}
+          <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-7">
+            <p className="label-cap">New session</p>
+            <h2 className="mt-2 text-2xl font-bold tracking-tight text-[var(--text)]">Send files</h2>
+            <p className="mt-1.5 text-sm text-[var(--muted)]">Open a room and share the code with the other device.</p>
+            <button onClick={create} className="btn-primary mt-6 w-full py-4">
+              Create Room →
             </button>
           </div>
 
-          <div className="rounded-[2rem] border border-[var(--line)] bg-white/80 p-7 shadow-xl shadow-slate-200/50 backdrop-blur-lg">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">Join a session</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--text)]">Receive files</h2>
-            <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">Paste the six-character room code from the sender.</p>
+          {/* join */}
+          <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-7">
+            <p className="label-cap">Join session</p>
+            <h2 className="mt-2 text-2xl font-bold tracking-tight text-[var(--text)]">Receive files</h2>
+            <p className="mt-1.5 text-sm text-[var(--muted)]">Enter the 6-character code from the sender.</p>
             <input
               value={joinCode}
               onChange={(e) => setJoinCode(normalizeRoomCode(e.target.value))}
               onKeyDown={(e) => e.key === 'Enter' && join()}
               placeholder="ABC123"
               maxLength={6}
-              className="mt-6 w-full rounded-[1.2rem] border border-[var(--line)] bg-white/90 px-4 py-4 text-center text-2xl font-semibold tracking-[0.35em] text-[var(--text)] placeholder:text-slate-400 focus:border-[var(--accent)] focus:outline-none focus:ring-4 focus:ring-indigo-500/10"
+              className="mt-6 w-full rounded-xl border border-[var(--line)] bg-[var(--surface-3)] px-4 py-4 text-center text-2xl font-bold tracking-[0.4em] text-[var(--text)] placeholder:text-[var(--muted)] focus:border-[var(--line-focus)] focus:outline-none focus:ring-2 focus:ring-violet-500/20"
             />
             <button
               onClick={join}
               disabled={joinCode.length !== 6}
-              className="mt-4 w-full rounded-[1.2rem] border border-slate-800 bg-[var(--text)] px-5 py-4 text-sm font-semibold text-white shadow-lg shadow-slate-900/10 hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+              className="btn-ghost mt-3 w-full py-4"
             >
               Join Room
             </button>
