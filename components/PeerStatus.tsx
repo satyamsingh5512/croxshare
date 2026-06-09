@@ -3,26 +3,23 @@
 import React from 'react';
 import type { PeerStatus } from '@/types';
 
-interface Props {
-  status: PeerStatus;
-  peerName: string | null;
-}
+interface Props { status: PeerStatus; peerName: string | null; }
 
-const statusConfig: Record<PeerStatus, { label: string; dot: string; bg: string; text: string; ring: string }> = {
-  idle: { label: 'Not connected', dot: 'bg-slate-400', bg: 'bg-white/80', text: 'text-slate-600', ring: 'border-[var(--line)]' },
-  waiting: { label: 'Waiting for peer', dot: 'bg-amber-500 animate-pulse', bg: 'bg-amber-50/90', text: 'text-amber-800', ring: 'border-amber-500/20' },
-  connecting: { label: 'Connecting...', dot: 'bg-sky-500 animate-pulse', bg: 'bg-sky-50/90', text: 'text-sky-800', ring: 'border-sky-500/20' },
-  connected: { label: 'Connected', dot: 'bg-emerald-500', bg: 'bg-emerald-50/90', text: 'text-emerald-800', ring: 'border-emerald-500/20' },
-  disconnected: { label: 'Disconnected', dot: 'bg-rose-500', bg: 'bg-rose-50/90', text: 'text-rose-800', ring: 'border-rose-500/20' },
-  error: { label: 'Error', dot: 'bg-rose-600', bg: 'bg-rose-50/90', text: 'text-rose-900', ring: 'border-rose-500/30' },
+const cfg: Record<PeerStatus, { label: string; dot: string; border: string; text: string; bg: string }> = {
+  idle:         { label: 'Idle',              dot: 'bg-[var(--muted)]',                              border: 'border-[var(--line)]',         text: 'text-[var(--muted)]',   bg: 'bg-[var(--surface-3)]' },
+  waiting:      { label: 'Waiting for peer',  dot: 'bg-[var(--warn)] animate-pulse',                 border: 'border-amber-500/25',          text: 'text-amber-300',        bg: 'bg-amber-500/10' },
+  connecting:   { label: 'Connecting…',       dot: 'bg-[var(--info)] animate-pulse',                 border: 'border-blue-500/25',           text: 'text-blue-300',         bg: 'bg-blue-500/10' },
+  connected:    { label: 'Connected',         dot: 'bg-[var(--ok)]',                                 border: 'border-emerald-500/25',        text: 'text-emerald-300',      bg: 'bg-emerald-500/10' },
+  disconnected: { label: 'Disconnected',      dot: 'bg-[var(--err)]',                                border: 'border-rose-500/25',           text: 'text-rose-300',         bg: 'bg-rose-500/10' },
+  error:        { label: 'Error',             dot: 'bg-[var(--err)]',                                border: 'border-rose-500/30',           text: 'text-rose-300',         bg: 'bg-rose-500/10' },
 };
 
 export default function PeerStatus({ status, peerName }: Props) {
-  const cfg = statusConfig[status];
+  const c = cfg[status];
   return (
-    <div className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] shadow-sm backdrop-blur-md transition-all duration-300 ${cfg.bg} ${cfg.text} ${cfg.ring}`}>
-      <span className={`h-2 w-2 rounded-full ${cfg.dot} shadow-sm`} />
-      {status === 'connected' && peerName ? `Connected · ${peerName}` : cfg.label}
+    <div className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] ${c.bg} ${c.text} ${c.border}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} />
+      {status === 'connected' && peerName ? `${peerName} · ready` : c.label}
     </div>
   );
 }
