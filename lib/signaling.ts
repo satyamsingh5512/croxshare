@@ -1,6 +1,6 @@
 import type { PresenceChannel } from 'pusher-js';
 import type { SignalMessage } from '@/types';
-import { getPusherClient } from '@/lib/pusher-client';
+import { getPusherClient, setPusherAuthIdentity } from '@/lib/pusher-client';
 
 interface JoinOptions {
   roomId: string;
@@ -8,7 +8,7 @@ interface JoinOptions {
   myName: string;
   onReady: (id: string) => void;
   onPeerJoined: (peerId: string, peerName: string) => void;
-  onPeerLeft: () => void;
+  onPeerLeft: (peerId: string) => void;
   onSignal: (msg: SignalMessage) => void;
   onError?: (message: string) => void;
 }
@@ -18,6 +18,9 @@ export class SignalingClient {
   private knownPeers = new Set<string>();
 
   join(options: JoinOptions) {
+    // Set identity BEFORE subscribing so auth requests carry it via headers.
+    setPusherAuthIdentity(options.myId, options.myName);
+
     let pusher;
     try {
       pusher = getPusherClient();
@@ -27,42 +30,28 @@ export class SignalingClient {
       return;
     }
 
-    // Ensure every auth request carries the latest identity for presence channels.
-    (pusher.config as any).channelAuthorization = {
-      ...((pusher.config as any).channelAuthorization || {}),
-      endpoint: '/api/signal',
-      transport: 'ajax',
-      paramsProvider: () => ({ user_id: options.myId, user_name: options.myName }),
-    };
-
     const channelName = `presence-room-${options.roomId}`;
     const channel = pusher.subscribe(channelName) as PresenceChannel;
     this.channel = channel;
     this.knownPeers.clear();
 
     pusher.connection.bind('error', (error: any) => {
-      const message = error?.error?.data?.message || error?.error?.message || 'Signaling connection failed';
+      const message =
+        error?.error?.data?.message || error?.error?.message || 'Signaling connection failed';
       options.onError?.(message);
     });
 
     channel.bind('pusher:subscription_succeeded', (members: any) => {
       options.onReady(options.myId);
-      const others: any[] = [];
       members.each((member: any) => {
-        if (member.id !== options.myId) others.push(member);
+        if (member.id === options.myId) return;
+        if (this.knownPeers.has(member.id)) return;
+        this.knownPeers.add(member.id);
+        // setTimeout ensures onReady's myId ref update propagates before host election.
+        setTimeout(() => {
+          options.onPeerJoined(member.id, member.info?.name || 'Unknown device');
+        }, 0);
       });
-      // Presence sync can include stale entries or multiple peers; pick one deterministically.
-      // Use setTimeout to ensure onReady's side-effect (setting mySocketIdRef) propagates
-      // through React state before the host-election logic in onPeerJoined runs.
-      if (others.length > 0) {
-        const peer = others.sort((a, b) => String(a.id).localeCompare(String(b.id)))[0];
-        if (!this.knownPeers.has(peer.id)) {
-          this.knownPeers.add(peer.id);
-          setTimeout(() => {
-            options.onPeerJoined(peer.id, peer.info?.name || 'Unknown device');
-          }, 0);
-        }
-      }
     });
 
     channel.bind('pusher:member_added', (member: any) => {
@@ -73,10 +62,11 @@ export class SignalingClient {
     });
 
     channel.bind('pusher:member_removed', (member: any) => {
-      if (member?.id) {
-        this.knownPeers.delete(member.id);
+      const peerId = member?.id;
+      if (peerId) {
+        this.knownPeers.delete(peerId);
+        options.onPeerLeft(peerId);
       }
-      options.onPeerLeft();
     });
 
     channel.bind('pusher:subscription_error', (status: number) => {
@@ -85,6 +75,8 @@ export class SignalingClient {
 
     channel.bind('signal', (msg: SignalMessage) => {
       if (msg.from === options.myId) return;
+      // Ignore signals targeted at someone else.
+      if (msg.to && msg.to !== options.myId) return;
       options.onSignal(msg);
     });
   }
@@ -94,11 +86,12 @@ export class SignalingClient {
     from: string,
     type: SignalMessage['type'],
     data: SignalMessage['data'],
+    to?: string,
   ) {
     const res = await fetch('/api/signal', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ roomId, type, data, from }),
+      body: JSON.stringify({ roomId, type, data, from, to }),
     });
 
     if (!res.ok) {
