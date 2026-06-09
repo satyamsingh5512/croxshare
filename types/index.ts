@@ -3,7 +3,14 @@ export type PeerStatus = 'idle' | 'waiting' | 'connecting' | 'connected' | 'disc
 export interface SignalMessage {
   type: 'offer' | 'answer' | 'ice';
   data: RTCSessionDescriptionInit | RTCIceCandidateInit;
-  from: string; // Pusher socket_id of sender
+  from: string;
+  to?: string; // target peer ID for directed signals
+}
+
+export interface DiscoveredPeer {
+  id: string;
+  name: string;
+  status: 'discovered' | 'connecting' | 'connected' | 'disconnected';
 }
 
 export interface FileMetadata {
