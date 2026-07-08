@@ -95,6 +95,38 @@ Render's free tier spins the service down after 15 minutes of inactivity
 are subject to the same timeout). Use a paid instance type for always-on
 availability.
 
+### Health check
+
+`server.js` exposes a lightweight `GET /healthz` endpoint that returns `200 ok`
+without rendering a page. `render.yaml` points Render's health probe at it via
+`healthCheckPath: /healthz`, so deploys are only marked live once the app
+actually responds.
+
+### Keep the free instance warm (optional)
+
+To avoid cold starts on the free tier, `.github/workflows/keep-warm.yml` pings
+`/healthz` every ~10 minutes (just under Render's 15-minute idle window) using a
+scheduled GitHub Actions workflow. To enable it:
+
+1. In your GitHub repo, go to **Settings → Secrets and variables → Actions**.
+2. Add a repository secret named `RENDER_APP_URL` set to your service URL
+   (e.g. `https://croxshare.onrender.com`).
+3. The workflow then runs on schedule automatically. You can also trigger it
+   manually from the **Actions** tab (workflow_dispatch).
+
+Caveats:
+
+- **Free-tier hours**: Render's free web services share a monthly instance-hour
+  allowance (~750 hrs). Keeping one service warm 24/7 uses ~730 hrs — it fits,
+  but leaves little headroom if you run other free services.
+- **Schedule drift**: GitHub may delay scheduled runs during peak load, which is
+  why the interval is set well below 15 minutes.
+- **Inactivity pause**: GitHub disables scheduled workflows after 60 days without
+  repo activity. Push a commit (or re-enable the workflow) to resume.
+- **Alternatives**: external uptime pingers like UptimeRobot or cron-job.org work
+  just as well if you prefer not to use GitHub Actions.
+
+
 ## Resume-aligned highlights
 
 - WebRTC-based P2P file sharing with Node.js signaling and WebSockets.
