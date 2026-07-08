@@ -1,113 +1,96 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ArrowRight, Zap, Wifi, ShieldCheck } from 'lucide-react';
 import { generateRoomCode, normalizeRoomCode } from '@/lib/utils';
-
-const features = [
-  { n: '01', t: 'Create a room', d: 'One tap opens a private room with a short code. Nothing persists after you leave.' },
-  { n: '02', t: 'Share the code', d: 'Hand the 6-character code to the other device. No accounts, no friction.' },
-  { n: '03', t: 'Files move direct', d: 'WebRTC DataChannel — browser to browser. No relay server touches your files.' },
-];
 
 export default function HomePage() {
   const router = useRouter();
-  const [joinCode, setJoinCode] = useState('');
+  const [code, setCode] = useState('');
+  const [creating, setCreating] = useState(false);
 
-  function create() { router.push(`/room/${generateRoomCode()}`); }
-  function join() {
-    const code = normalizeRoomCode(joinCode);
-    if (code.length === 6) router.push(`/room/${code}`);
-  }
+  const createRoom = () => {
+    setCreating(true);
+    const id = generateRoomCode();
+    setTimeout(() => router.push(`/room/${id}`), 180);
+  };
+
+  const features = [
+    { icon: Zap, title: 'Direct DataChannel', body: 'Files stream peer-to-peer — never through a relay server.' },
+    { icon: Wifi, title: 'LAN-first speed', body: 'On the same network, transfers run at local link speed.' },
+    { icon: ShieldCheck, title: 'Nothing stored', body: 'No cloud, no login, no size cap. Bytes leave no trace.' },
+  ];
 
   return (
-    <div className="relative min-h-screen overflow-hidden px-4 py-10 sm:px-6 lg:px-8">
-      {/* ambient orbs */}
-      <div className="pointer-events-none absolute -left-32 -top-32 h-96 w-96 rounded-full bg-violet-700/20 blur-[120px]" />
-      <div className="pointer-events-none absolute -bottom-40 -right-20 h-[28rem] w-[28rem] rounded-full bg-purple-900/30 blur-[140px]" />
+    <main className="relative min-h-screen overflow-hidden">
+      <div className="mesh-bg pointer-events-none absolute inset-0 h-[520px]" />
 
-      <div className="mx-auto grid min-h-[calc(100vh-5rem)] max-w-6xl items-center gap-8 lg:grid-cols-[1.2fr_0.8fr]">
+      <div className="relative mx-auto max-w-md px-6 py-16">
+        <div className="reveal flex items-center gap-2" style={{ animationDelay: '0ms' }}>
+          <span className="relative flex h-2 w-2 text-[var(--ok)]">
+            <span className="dot-pulse absolute inline-flex h-full w-full rounded-full" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--ok)]" />
+          </span>
+          <span className="text-xs font-medium text-[var(--on-surface-variant)]">Peer-to-peer · no cloud</span>
+        </div>
 
-        {/* ── left: hero ── */}
-        <section className="relative">
-          {/* logo wordmark */}
-          <div className="mb-10 inline-flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-700 shadow-lg shadow-violet-900/50">
-              <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" className="h-5 w-5">
-                <path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2" />
-                <rect x="8" y="8" width="12" height="12" rx="2" />
-              </svg>
-            </div>
-            <span className="text-sm font-semibold tracking-wide text-[var(--text-2)]">Croxshare</span>
-          </div>
+        <h1
+          className="reveal mt-5 text-[2.6rem] font-bold leading-[1.05] tracking-tight text-[var(--on-surface)]"
+          style={{ animationDelay: '60ms' }}
+        >
+          Send files<br />
+          <span className="text-gradient">wire to wire.</span>
+        </h1>
 
-          <h1 className="max-w-xl text-[3.5rem] font-bold leading-[1.0] tracking-[-0.04em] text-[var(--text)] sm:text-6xl lg:text-7xl">
-            Move files.<br />
-            <span className="bg-gradient-to-r from-violet-400 to-purple-300 bg-clip-text text-transparent">
-              Zero friction.
-            </span>
-          </h1>
+        <p className="reveal mt-4 text-[15px] leading-relaxed text-[var(--on-surface-variant)]" style={{ animationDelay: '120ms' }}>
+          Open a room, share the code, and drop files straight
+          onto the other device. WebRTC does the rest.
+        </p>
 
-          <p className="mt-6 max-w-md text-base leading-relaxed text-[var(--muted)] sm:text-[1.05rem]">
-            Create a room, pass a short code, and transfer files directly between browsers — no cloud, no login, no size limits.
-          </p>
+        <div className="reveal mt-8 space-y-3" style={{ animationDelay: '180ms' }}>
+          <button onClick={createRoom} disabled={creating} className="btn group w-full">
+            <span>{creating ? 'Opening room…' : 'Create a room'}</span>
+            <ArrowRight
+              size={16}
+              className={creating ? 'animate-pulse' : 'transition-transform duration-200 group-hover:translate-x-0.5'}
+            />
+          </button>
 
-          {/* feature steps */}
-          <div className="mt-10 grid gap-3 sm:grid-cols-3">
-            {features.map((f) => (
-              <div key={f.n} className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-5 transition hover:border-[var(--line-bright)] hover:bg-[var(--surface-3)]">
-                <p className="label-cap text-violet-500">{f.n}</p>
-                <p className="mt-3 text-sm font-semibold text-[var(--text)]">{f.t}</p>
-                <p className="mt-1.5 text-xs leading-relaxed text-[var(--muted)]">{f.d}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* pills */}
-          <div className="mt-8 flex flex-wrap gap-2">
-            {['WebRTC P2P', 'No login', 'Any file type', 'LAN-first'].map((t) => (
-              <span key={t} className="rounded-full border border-[var(--line)] bg-[var(--accent-soft)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--accent)]">
-                {t}
-              </span>
-            ))}
-          </div>
-        </section>
-
-        {/* ── right: action cards ── */}
-        <section className="space-y-4">
-          {/* create */}
-          <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-7">
-            <p className="label-cap">New session</p>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight text-[var(--text)]">Send files</h2>
-            <p className="mt-1.5 text-sm text-[var(--muted)]">Open a room and share the code with the other device.</p>
-            <button onClick={create} className="btn-primary mt-6 w-full py-4">
-              Create Room →
-            </button>
-          </div>
-
-          {/* join */}
-          <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-7">
-            <p className="label-cap">Join session</p>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight text-[var(--text)]">Receive files</h2>
-            <p className="mt-1.5 text-sm text-[var(--muted)]">Enter the 6-character code from the sender.</p>
+          <div className="flex gap-2">
             <input
-              value={joinCode}
-              onChange={(e) => setJoinCode(normalizeRoomCode(e.target.value))}
-              onKeyDown={(e) => e.key === 'Enter' && join()}
-              placeholder="ABC123"
+              value={code}
+              onChange={(e) => setCode(normalizeRoomCode(e.target.value))}
+              onKeyDown={(e) => e.key === 'Enter' && code.length === 6 && router.push(`/room/${code}`)}
+              placeholder="Enter 6-digit code"
               maxLength={6}
-              className="mt-6 w-full rounded-xl border border-[var(--line)] bg-[var(--surface-3)] px-4 py-4 text-center text-2xl font-bold tracking-[0.4em] text-[var(--text)] placeholder:text-[var(--muted)] focus:border-[var(--line-focus)] focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+              aria-label="Room code"
+              className="input mono flex-1 text-center text-base tracking-[0.3em] uppercase"
             />
             <button
-              onClick={join}
-              disabled={joinCode.length !== 6}
-              className="btn-ghost mt-3 w-full py-4"
+              onClick={() => code.length === 6 && router.push(`/room/${code}`)}
+              disabled={code.length !== 6}
+              className="btn-tonal px-6"
             >
-              Join Room
+              Join
             </button>
           </div>
-        </section>
+        </div>
+
+        <div className="reveal mt-12 space-y-3" style={{ animationDelay: '260ms' }}>
+          {features.map(({ icon: Icon, title, body }) => (
+            <div key={title} className="card flex items-start gap-3.5 p-4 transition-shadow duration-200 hover:shadow-[var(--elev-2)]">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--primary-container)] text-[var(--primary)]">
+                <Icon size={18} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-[var(--on-surface)]">{title}</p>
+                <p className="mt-0.5 text-[13px] leading-snug text-[var(--on-surface-variant)]">{body}</p>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
+    </main>
   );
 }
