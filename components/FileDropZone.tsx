@@ -1,51 +1,59 @@
 'use client';
 
-import React, { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
+import { UploadCloud, FileUp } from 'lucide-react';
 
-interface Props { onFiles: (files: File[]) => void; disabled?: boolean; }
+interface Props {
+  onFiles: (files: File[]) => void;
+  disabled?: boolean;
+}
 
 export default function FileDropZone({ onFiles, disabled }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
   const handle = useCallback((list: FileList | null) => {
-    if (!list?.length) return;
-    onFiles(Array.from(list));
+    if (list?.length) onFiles(Array.from(list));
   }, [onFiles]);
 
   return (
-    <div
+    <motion.div
       onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
       onDragLeave={() => setDragging(false)}
       onDrop={(e) => { e.preventDefault(); setDragging(false); handle(e.dataTransfer.files); }}
       onClick={() => !disabled && inputRef.current?.click()}
+      animate={dragging ? { scale: 1.01 } : { scale: 1 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+      role="button"
+      tabIndex={disabled ? -1 : 0}
+      aria-disabled={disabled}
+      onKeyDown={(e) => { if (!disabled && (e.key === 'Enter' || e.key === ' ')) inputRef.current?.click(); }}
       className={[
-        'relative overflow-hidden rounded-2xl border px-6 py-12 text-center transition-all duration-200',
+        'flex flex-col items-center gap-3 rounded-3xl border-2 border-dashed px-6 py-12 text-center transition-colors duration-200',
         dragging
-          ? 'border-violet-500/60 bg-violet-500/10 shadow-lg shadow-violet-900/30'
-          : 'border-[var(--line)] bg-[var(--surface-2)] hover:border-[var(--line-bright)] hover:bg-[var(--surface-3)]',
-        disabled ? 'cursor-not-allowed opacity-40' : 'cursor-pointer',
+          ? 'border-[var(--primary)] bg-[var(--primary-container)]/50'
+          : 'border-[var(--outline)] bg-[var(--surface)]',
+        disabled ? 'cursor-not-allowed opacity-40' : 'cursor-pointer hover:border-[var(--primary)] hover:bg-[var(--surface-1)]',
       ].join(' ')}
     >
-      {/* top glow line */}
-      <div className={`pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-500/40 to-transparent transition-opacity duration-300 ${dragging ? 'opacity-100' : 'opacity-0'}`} />
-
-      <div className={`mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border transition-colors duration-200 ${dragging ? 'border-violet-500/40 bg-violet-500/20 text-violet-300' : 'border-[var(--line)] bg-[var(--surface-3)] text-[var(--accent)]'}`}>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-7 w-7">
-          <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1" />
-          <polyline points="16 6 12 2 8 6" />
-          <line x1="12" y1="2" x2="12" y2="15" />
-        </svg>
+      <motion.div
+        animate={dragging ? { y: -4, scale: 1.05 } : { y: 0, scale: 1 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+        className={[
+          'flex h-14 w-14 items-center justify-center rounded-2xl transition-colors duration-200',
+          dragging ? 'bg-[var(--primary)] text-white' : 'bg-[var(--primary-container)] text-[var(--primary)]',
+        ].join(' ')}
+      >
+        {dragging ? <FileUp size={22} /> : <UploadCloud size={22} />}
+      </motion.div>
+      <div>
+        <p className="text-sm font-semibold text-[var(--on-surface)]">
+          {dragging ? 'Drop to send' : 'Drag files here, or click to browse'}
+        </p>
+        <p className="mt-1 text-[13px] text-[var(--on-surface-variant)]">Sent directly to the connected device</p>
       </div>
-
-      <p className="mt-5 text-base font-bold tracking-tight text-[var(--text)]">
-        {dragging ? 'Drop to send' : 'Drag & drop files or click to browse'}
-      </p>
-      <p className="mt-2 text-sm text-[var(--muted)]">
-        Any file type · sent directly to the connected device
-      </p>
-
       <input ref={inputRef} type="file" multiple className="hidden" disabled={disabled} onChange={(e) => handle(e.target.files)} />
-    </div>
+    </motion.div>
   );
 }
