@@ -1,6 +1,7 @@
 node_modules
 .next
-.env*
-.vercel
+.env
+.env.*
+!.env.example
 
 certificates
