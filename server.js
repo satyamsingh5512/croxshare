@@ -22,6 +22,14 @@ function broadcast(roomId, payload, excludeId = null) {
 
 app.prepare().then(() => {
   const server = createServer((req, res) => {
+    // Lightweight health check for Render's health probe and keep-warm pings.
+    // Short-circuits before Next.js so it stays cheap and never renders a page.
+    if (req.url === '/healthz') {
+      res.writeHead(200, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' });
+      res.end('ok');
+      return;
+    }
+
     const parsedUrl = parse(req.url, true);
     handle(req, res, parsedUrl);
   });
