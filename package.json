@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "description": "Decentralized chat web app with P2P file sharing",
   "scripts": {
-    "dev": "next dev --experimental-https --hostname 0.0.0.0",
+    "dev": "NODE_ENV=development node server.js",
     "build": "next build",
-    "start": "next start",
+    "start": "NODE_ENV=production node server.js",
     "typecheck": "tsc --noEmit",
     "lint": "npm run typecheck",
     "test": "npm run typecheck && npm run build"
@@ -21,17 +21,17 @@
     "lucide-react": "^0.554.0",
     "next": "^15.0.3",
     "postcss": "^8.5.6",
-    "pusher": "^5.3.2",
-    "pusher-js": "^8.4.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "tailwind-merge": "^3.4.0",
     "tailwindcss": "^3.4.18",
     "typescript": "^5.9.3",
+    "ws": "8.18.0",
     "zustand": "^5.0.11"
   },
   "devDependencies": {
+    "@types/ws": "8.5.13",
     "tsx": "^4.20.6"
   },
   "main": "index.js",
