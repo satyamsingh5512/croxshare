@@ -73,6 +73,28 @@ Open `http://localhost:3000` or `http://<LAN_IP>:3000`.
 - `PUSHER_APP_ID`, `PUSHER_SECRET`, `NEXT_PUBLIC_PUSHER_KEY`, `NEXT_PUBLIC_PUSHER_CLUSTER`
 - `TURN_URLS`, `TURN_USERNAME`, `TURN_CREDENTIAL` (optional)
 
+## Deployment
+
+This app runs a custom Node server (`server.js`) with a `ws` WebSocket signaling
+server attached, so it needs a host that supports persistent, long-running
+processes — not a stateless serverless platform like Vercel.
+
+Deploy on [Render](https://render.com) as a **Web Service**:
+
+1. Push this repo to GitHub/GitLab.
+2. In the Render dashboard, choose New → Web Service and connect the repo
+   (or run `render.yaml` as a Blueprint for infra-as-code setup).
+3. Build command: `npm install && npm run build`
+4. Start command: `npm start`
+5. Set the environment variables listed above in the Render dashboard —
+   in particular `NEXT_PUBLIC_APP_URL` should be your `onrender.com` URL
+   (or custom domain).
+
+Render's free tier spins the service down after 15 minutes of inactivity
+(cold starts take 30–60s on the next request, and idle WebSocket connections
+are subject to the same timeout). Use a paid instance type for always-on
+availability.
+
 ## Resume-aligned highlights
 
 - WebRTC-based P2P file sharing with Node.js signaling and WebSockets.
