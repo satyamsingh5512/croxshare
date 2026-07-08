@@ -1,6 +1,4 @@
-import type { PresenceChannel } from 'pusher-js';
 import type { SignalMessage } from '@/types';
-import { getPusherClient, setPusherAuthIdentity } from '@/lib/pusher-client';
 
 interface JoinOptions {
   roomId: string;
@@ -14,97 +12,48 @@ interface JoinOptions {
 }
 
 export class SignalingClient {
-  private channel: PresenceChannel | null = null;
-  private knownPeers = new Set<string>();
+  private ws: WebSocket | null = null;
+  private opts: JoinOptions | null = null;
 
-  join(options: JoinOptions) {
-    // Set identity BEFORE subscribing so auth requests carry it via headers.
-    setPusherAuthIdentity(options.myId, options.myName);
+  join(opts: JoinOptions) {
+    this.opts = opts;
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws = new WebSocket(`${proto}://${location.host}/ws`);
+    this.ws = ws;
 
-    let pusher;
-    try {
-      pusher = getPusherClient();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unable to initialize signaling';
-      options.onError?.(msg);
-      return;
-    }
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ type: 'join', roomId: opts.roomId, peerId: opts.myId, name: opts.myName }));
+      opts.onReady(opts.myId);
+    };
 
-    const channelName = `presence-room-${options.roomId}`;
-    const channel = pusher.subscribe(channelName) as PresenceChannel;
-    this.channel = channel;
-    this.knownPeers.clear();
+    ws.onmessage = (ev) => {
+      let msg: any;
+      try { msg = JSON.parse(ev.data); } catch { return; }
 
-    pusher.connection.bind('error', (error: any) => {
-      const message =
-        error?.error?.data?.message || error?.error?.message || 'Signaling connection failed';
-      options.onError?.(message);
-    });
-
-    channel.bind('pusher:subscription_succeeded', (members: any) => {
-      options.onReady(options.myId);
-      members.each((member: any) => {
-        if (member.id === options.myId) return;
-        if (this.knownPeers.has(member.id)) return;
-        this.knownPeers.add(member.id);
-        // setTimeout ensures onReady's myId ref update propagates before host election.
-        setTimeout(() => {
-          options.onPeerJoined(member.id, member.info?.name || 'Unknown device');
-        }, 0);
-      });
-    });
-
-    channel.bind('pusher:member_added', (member: any) => {
-      if (member.id === options.myId) return;
-      if (this.knownPeers.has(member.id)) return;
-      this.knownPeers.add(member.id);
-      options.onPeerJoined(member.id, member.info?.name || 'Unknown device');
-    });
-
-    channel.bind('pusher:member_removed', (member: any) => {
-      const peerId = member?.id;
-      if (peerId) {
-        this.knownPeers.delete(peerId);
-        options.onPeerLeft(peerId);
+      if (msg.type === 'peers') {
+        for (const p of msg.peers) opts.onPeerJoined(p.id, p.name);
+      } else if (msg.type === 'peer-joined') {
+        opts.onPeerJoined(msg.peerId, msg.name);
+      } else if (msg.type === 'peer-left') {
+        opts.onPeerLeft(msg.peerId);
+      } else if (msg.type === 'signal') {
+        opts.onSignal({ type: msg.signal, data: msg.data, from: msg.from, to: opts.myId });
       }
-    });
+    };
 
-    channel.bind('pusher:subscription_error', (status: number) => {
-      options.onError?.(`Room subscription failed (${status})`);
-    });
-
-    channel.bind('signal', (msg: SignalMessage) => {
-      if (msg.from === options.myId) return;
-      // Ignore signals targeted at someone else.
-      if (msg.to && msg.to !== options.myId) return;
-      options.onSignal(msg);
-    });
+    ws.onerror = () => opts.onError?.('WebSocket connection failed');
+    ws.onclose = () => {};
   }
 
-  async sendSignal(
-    roomId: string,
-    from: string,
-    type: SignalMessage['type'],
-    data: SignalMessage['data'],
-    to?: string,
-  ) {
-    const res = await fetch('/api/signal', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ roomId, type, data, from, to }),
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(text || `Signal relay failed (${res.status})`);
+  sendSignal(_roomId: string, _from: string, type: SignalMessage['type'], data: SignalMessage['data'], to?: string) {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ type: 'signal', signal: type, data, to }));
     }
+    return Promise.resolve();
   }
 
   leave() {
-    if (this.channel) {
-      getPusherClient().unsubscribe(this.channel.name);
-    }
-    this.channel = null;
-    this.knownPeers.clear();
+    this.ws?.close();
+    this.ws = null;
   }
 }
